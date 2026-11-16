@@ -14,12 +14,13 @@ class DashboardController extends Controller
         $counts = Cases::selectRaw('status, COUNT(*) as c')->groupBy('status')->pluck('c', 'status');
 
         $stats = [
-            'pending' => (int) ($counts['Pending'] ?? 0),
+            'pending'       => (int) ($counts['Pending'] ?? 0),
+            'in_progress'   => (int) ($counts['In Progress'] ?? 0),
             'insufficiency' => (int) ($counts['Insufficiency'] ?? 0),
-            'amber' => (int) ($counts['Amber'] ?? 0),
-            'discrepancy' => (int) ($counts['Completed - Discrepancy Found'] ?? 0),
-            'green' => (int) ($counts['Completed - Green (Clear)'] ?? 0),
-            'on_hold' => (int) ($counts['On Hold'] ?? 0),
+            'amber'         => (int) ($counts['Amber'] ?? 0),
+            'discrepancy'   => (int) (($counts['Completed - Discrepancy Found'] ?? 0) + ($counts['Discrepancy Found'] ?? 0)),
+            'green'         => (int) ($counts['Completed - Green (Clear)'] ?? 0),
+            'on_hold'       => (int) ($counts['On Hold'] ?? 0),
         ];
 
         // Filterable case list (search / status / organization).

@@ -26,8 +26,8 @@ class CandidateInviteMail extends Mailable
     public function envelope(): Envelope
     {
         $subject = $this->reminder
-            ? 'Reminder: Upload Your Documents — Orbit Verify'
-            : 'Action Required: Upload Your Documents — Orbit Verify';
+            ? 'Reminder: Upload Your Documents - Orbit Verify'
+            : 'Action Required: Upload Your Documents - Orbit Verify';
 
         return new Envelope(subject: $subject);
     }

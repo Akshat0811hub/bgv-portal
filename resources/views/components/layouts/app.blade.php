@@ -9,7 +9,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
-<body class="h-full bg-[#f8fafc] font-sans" x-data="{ sidebarOpen: false }">
+<body class="h-full font-sans" x-data="{ sidebarOpen: false }">
 
 {{-- Mobile sidebar overlay --}}
 <div x-show="sidebarOpen"
@@ -19,26 +19,26 @@
      x-transition:leave="transition-opacity ease-linear duration-200"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 z-40 bg-black/50 lg:hidden"
+     class="fixed inset-0 z-40 bg-slate-900/40 backdrop-blur-xs lg:hidden"
      @click="sidebarOpen = false"
      style="display:none">
 </div>
 
 {{-- Sidebar --}}
-<aside class="fixed top-0 left-0 h-full w-64 bg-gradient-to-b from-[#0f2044] to-[#0d3a5f] z-50 flex flex-col transform transition-transform duration-300 ease-in-out
+<aside class="fixed top-0 left-0 h-full w-60 bg-gradient-to-b from-[#0b1936]/95 via-[#0f2247]/95 to-[#0b2f4d]/95 backdrop-blur-2xl border-r border-white/10 shadow-[4px_0_24px_rgba(15,32,68,0.18)] z-50 flex flex-col transform transition-transform duration-300 ease-in-out
               -translate-x-full lg:translate-x-0"
        :class="{ 'translate-x-0': sidebarOpen, '-translate-x-full lg:translate-x-0': !sidebarOpen }">
 
     {{-- Logo --}}
-    <div class="flex items-center gap-3 px-5 py-5 border-b border-white/10">
-        <div class="w-9 h-9 bg-[#0d9488] rounded-xl flex items-center justify-center shrink-0">
-            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+    <div class="flex items-center gap-3 px-5 py-4 border-b border-white/10">
+        <div class="w-8 h-8 bg-gradient-to-br from-[#14b8a6] to-[#0d9488] rounded-xl flex items-center justify-center shrink-0 shadow-[0_2px_10px_rgba(20,184,166,0.4)]">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
             </svg>
         </div>
         <div>
-            <div class="text-white font-bold text-base leading-tight">Orbit Verify</div>
-            <div class="text-slate-400 text-xs">{{ auth()->user()->isAdmin() ? 'Admin Portal' : 'Client Portal' }}</div>
+            <div class="text-white font-bold text-sm tracking-tight leading-tight">Orbit Verify</div>
+            <div class="text-teal-300/80 text-[11px] font-medium">{{ auth()->user()->isAdmin() ? 'Admin Portal' : 'Client Portal' }}</div>
         </div>
     </div>
 
@@ -52,9 +52,14 @@
             Dashboard
         </a>
         <a href="{{ route('admin.cases.index') }}"
-           class="{{ request()->routeIs('admin.cases.*') ? 'nav-item-active' : 'nav-item-inactive' }}">
+           class="{{ request()->routeIs('admin.cases.index', 'admin.cases.show') ? 'nav-item-active' : 'nav-item-inactive' }}">
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
             All Cases
+        </a>
+        <a href="{{ route('admin.cases.create') }}"
+           class="{{ request()->routeIs('admin.cases.create') ? 'nav-item-active' : 'nav-item-inactive' }}">
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 4v16m8-8H4"/></svg>
+            New Case
         </a>
 
         <p class="section-label px-3 pt-4">Management</p>
@@ -79,9 +84,9 @@
             Dashboard
         </a>
         <a href="{{ route('client.cases.index') }}"
-           class="{{ request()->routeIs('client.cases.*') ? 'nav-item-active' : 'nav-item-inactive' }}">
+           class="{{ request()->routeIs('client.cases.index', 'client.cases.show') ? 'nav-item-active' : 'nav-item-inactive' }}">
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-            My Cases
+            Organization Cases
         </a>
         <a href="{{ route('client.cases.create') }}"
            class="{{ request()->routeIs('client.cases.create') ? 'nav-item-active' : 'nav-item-inactive' }}">
@@ -117,7 +122,7 @@
             </div>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
-                <button type="submit" class="text-slate-400 hover:text-white transition-colors" title="Logout">
+                <button type="submit" class="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10" title="Logout">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
                 </button>
             </form>
@@ -126,21 +131,27 @@
 </aside>
 
 {{-- Main content area --}}
-<div class="lg:pl-64 min-h-screen flex flex-col">
+<div class="lg:pl-60 min-h-screen flex flex-col">
 
     {{-- Top bar --}}
-    <header class="sticky top-0 z-30 bg-white border-b border-[#e2e8f0] px-4 sm:px-6 py-3.5 flex items-center gap-4">
-        <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-1.5 rounded-lg hover:bg-[#f8fafc] text-[#64748b]">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <header class="sticky top-0 z-30 bg-white/75 backdrop-blur-xl border-b border-slate-200/70 shadow-[0_1px_3px_rgba(15,32,68,0.03)] px-4 sm:px-6 py-2.5 flex items-center gap-4">
+        <button @click="sidebarOpen = !sidebarOpen" class="lg:hidden p-1.5 rounded-lg hover:bg-slate-100/80 text-[#64748b] transition-colors">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
             </svg>
         </button>
-        <div class="flex-1">
-            <h1 class="text-base font-semibold text-[#0f2044]">{{ $title ?? 'Dashboard' }}</h1>
+        <div class="flex-1 min-w-0">
+            <h1 class="text-sm font-bold text-[#0f2044] tracking-tight truncate">{{ $title ?? 'Dashboard' }}</h1>
         </div>
-        <div class="flex items-center gap-3 text-sm text-[#64748b]">
-            <span class="hidden sm:block">{{ auth()->user()->name }}</span>
-            <div class="w-8 h-8 rounded-full bg-[#0f2044] flex items-center justify-center text-white text-xs font-bold">
+        <div class="flex items-center gap-2.5 text-xs text-[#64748b]">
+            @if(!auth()->user()->isAdmin() && auth()->user()->clientOrganization)
+                <span class="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-slate-100/80 border border-slate-200/60 text-slate-700">
+                    <svg class="w-3 h-3 text-[#0d9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    {{ auth()->user()->clientOrganization->name }}
+                </span>
+            @endif
+            <span class="hidden sm:block font-medium text-slate-700">{{ auth()->user()->name }}</span>
+            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-[#162d5c] to-[#0f2044] flex items-center justify-center text-white text-[11px] font-bold shrink-0 shadow-xs">
                 {{ strtoupper(substr(auth()->user()->name, 0, 1)) }}
             </div>
         </div>
@@ -149,21 +160,30 @@
     {{-- Flash messages --}}
     <div class="px-4 sm:px-6 pt-4">
         @if(session('success'))
-        <div class="alert-success mb-4">
-            <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
-            {{ session('success') }}
+        <div x-data="{ show: true }" x-show="show" x-transition class="alert-success mb-4 items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 shrink-0 text-emerald-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                <span>{{ session('success') }}</span>
+            </div>
+            <button @click="show = false" class="text-emerald-700 hover:text-emerald-900 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         @endif
         @if(session('error'))
-        <div class="alert-error mb-4">
-            <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
-            {{ session('error') }}
+        <div x-data="{ show: true }" x-show="show" x-transition class="alert-error mb-4 items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 shrink-0 text-red-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                <span>{{ session('error') }}</span>
+            </div>
+            <button @click="show = false" class="text-red-700 hover:text-red-900 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         @endif
         @if(session('warning'))
-        <div class="alert-warning mb-4">
-            <svg class="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
-            {{ session('warning') }}
+        <div x-data="{ show: true }" x-show="show" x-transition class="alert-warning mb-4 items-center justify-between">
+            <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 shrink-0 text-amber-600" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                <span>{{ session('warning') }}</span>
+            </div>
+            <button @click="show = false" class="text-amber-700 hover:text-amber-900 p-1"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
         </div>
         @endif
     </div>

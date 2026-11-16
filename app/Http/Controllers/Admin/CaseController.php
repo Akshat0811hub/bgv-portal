@@ -11,6 +11,7 @@ use App\Models\Cases;
 use App\Models\Check;
 use App\Models\ClientOrganization;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
@@ -21,22 +22,28 @@ class CaseController extends Controller
 
     public function index(Request $request)
     {
-        $query = Cases::with('clientOrganization', 'createdBy')->latest();
+        $query = Cases::with('clientOrganization', 'createdBy', 'checks')->latest();
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+        if ($request->filled('org')) {
+            $query->where('client_organization_id', $request->org);
         }
         if ($request->filled('search')) {
             $s = $request->search;
             $query->where(fn ($q) => $q->where('candidate_name', 'like', "%$s%")
                 ->orWhere('case_number', 'like', "%$s%")
                 ->orWhere('candidate_email', 'like', "%$s%")
+                ->orWhere('candidate_phone', 'like', "%$s%")
+                ->orWhereHas('clientOrganization', fn ($o) => $o->where('name', 'like', "%$s%"))
             );
         }
 
         $cases = $query->paginate(15)->withQueryString();
+        $organizations = ClientOrganization::orderBy('name')->get();
 
-        return view('admin.cases.index', compact('cases'));
+        return view('admin.cases.index', compact('cases', 'organizations'));
     }
 
     public function create()
@@ -59,36 +66,41 @@ class CaseController extends Controller
             'candidate_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\+\-\s\(\)]+$/'],
             'candidate_father_name' => 'nullable|string|max:150',
             'candidate_designation' => 'nullable|string|max:100',
-            'mode' => 'required|in:send_link,admin_upload',
+            'mode' => 'required|in:send_link,admin_upload,self_upload',
             'checks' => 'required|array|min:1|max:20',
             'checks.*' => ['required', 'string', 'in:'.implode(',', $validCheckSlugs)],
             'check_files' => 'nullable|array',
             'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
         ]);
 
-        $case = Cases::create([
-            'case_number' => Cases::generateCaseNumber(),
-            'client_organization_id' => $data['client_organization_id'],
-            'created_by' => auth()->id(),
-            'status' => 'Pending',
-            'candidate_name' => $data['candidate_name'],
-            'candidate_email' => $data['candidate_email'],
-            'candidate_phone' => $data['candidate_phone'] ?? null,
-            'candidate_father_name' => $data['candidate_father_name'] ?? null,
-            'candidate_designation' => $data['candidate_designation'] ?? null,
-            'case_start_date' => today(),
-        ]);
+        $case = DB::transaction(function () use ($data) {
+            $case = Cases::create([
+                'case_number' => Cases::generateCaseNumber(),
+                'client_organization_id' => $data['client_organization_id'],
+                'created_by' => auth()->id(),
+                'status' => 'Pending',
+                'candidate_name' => $data['candidate_name'],
+                'candidate_email' => $data['candidate_email'],
+                'candidate_phone' => $data['candidate_phone'] ?? null,
+                'candidate_father_name' => $data['candidate_father_name'] ?? null,
+                'candidate_designation' => $data['candidate_designation'] ?? null,
+                'case_start_date' => today(),
+            ]);
 
-        foreach ($data['checks'] as $slug) {
-            $case->checks()->create(['check_type' => $slug, 'status' => 'Pending']);
-        }
+            foreach ($data['checks'] as $slug) {
+                $case->checks()->create(['check_type' => $slug, 'status' => 'Pending']);
+            }
+
+            return $case;
+        });
+
         $case->load('checks', 'clientOrganization');
 
         // Persist any details / documents the admin entered (optional in either mode).
         $this->captureCheckSubmission($request, $case, 'admin');
-        $case->update(['status' => $case->recalculateStatus()]);
+        $case->syncStatusAndCloseDate();
 
-        if ($data['mode'] === 'admin_upload') {
+        if (in_array($data['mode'], ['admin_upload', 'self_upload'])) {
             return redirect()->route('admin.cases.show', $case)
                 ->with('success', 'Case created with the details you entered.');
         }
@@ -126,13 +138,19 @@ class CaseController extends Controller
 
     public function triggerInsufficiency(Request $request, Cases $case, CaseCheck $check)
     {
+        abort_if($check->case_id !== $case->id, 404);
         $data = $request->validate(['reason' => 'nullable|string|max:1000']);
 
-        $check->update(['status' => 'Insufficiency']);
-        $case->update(['status' => $case->recalculateStatus()]);
+        $check->update([
+            'status' => 'Insufficiency',
+            'comments' => $data['reason'] ? ('Insufficiency Raised: ' . $data['reason']) : $check->comments,
+            'completed_at' => null,
+        ]);
+        $case->syncStatusAndCloseDate();
+        $case->load('uploadToken');
 
-        // Issue / refresh a token so the candidate can re-upload.
-        $token = Str::random(48);
+        // Issue / refresh a token so the candidate can re-upload, preserving existing valid token so earlier emails stay valid.
+        $token = optional($case->uploadToken)->isValid() ? $case->uploadToken->token : Str::random(48);
         $case->uploadToken()->updateOrCreate(
             ['case_id' => $case->id],
             ['token' => $token, 'used' => false, 'expires_at' => now()->addDays(7)],
@@ -167,14 +185,70 @@ class CaseController extends Controller
     {
         $case->load('checks.documents', 'documents', 'clientOrganization', 'createdBy', 'uploadToken');
 
-        $schemas = Check::whereIn('slug', $case->checks->pluck('check_type'))->get()
-            ->mapWithKeys(fn ($c) => [$c->slug => $c->schema ?? []]);
+        $allChecks = Check::where('active', true)->get();
+        $schemas = $allChecks->mapWithKeys(fn ($c) => [$c->slug => $c->schema ?? []]);
 
-        return view('admin.cases.show', compact('case', 'schemas'));
+        return view('admin.cases.show', compact('case', 'schemas', 'allChecks'));
+    }
+
+    public function updateCandidate(Request $request, Cases $case)
+    {
+        $data = $request->validate([
+            'candidate_name' => 'required|string|max:150',
+            'candidate_email' => 'required|email|max:255',
+            'candidate_phone' => ['nullable', 'string', 'max:20', 'regex:/^[0-9\+\-\s\(\)]+$/'],
+            'candidate_father_name' => 'nullable|string|max:150',
+            'candidate_designation' => 'nullable|string|max:100',
+        ]);
+
+        $case->update($data);
+
+        return back()->with('success', 'Candidate profile updated.');
+    }
+
+    public function addCheck(Request $request, Cases $case)
+    {
+        $validSlugs = Check::where('active', true)->pluck('slug')->toArray();
+        $data = $request->validate([
+            'check_type' => ['required', 'string', 'in:' . implode(',', $validSlugs)],
+        ]);
+
+        if ($case->checks()->where('check_type', $data['check_type'])->exists()) {
+            return back()->with('warning', 'That check is already assigned to this case.');
+        }
+
+        $case->checks()->create([
+            'check_type' => $data['check_type'],
+            'status' => 'Pending',
+        ]);
+
+        $case->syncStatusAndCloseDate();
+
+        return back()->with('success', 'Check added to the case.');
+    }
+
+    public function destroyCheck(Cases $case, CaseCheck $check)
+    {
+        abort_if($check->case_id !== $case->id, 404);
+
+        if ($case->checks()->count() <= 1) {
+            return back()->with('error', 'A case must have at least one verification check.');
+        }
+
+        foreach ($check->documents as $doc) {
+            \Illuminate\Support\Facades\Storage::disk('local')->delete($doc->stored_path);
+            $doc->delete();
+        }
+
+        $check->delete();
+        $case->syncStatusAndCloseDate();
+
+        return back()->with('success', 'Check removed from the case.');
     }
 
     public function updateCheck(Request $request, Cases $case, CaseCheck $check)
     {
+        abort_if($check->case_id !== $case->id, 404);
         $data = $request->validate([
             'status' => 'required|in:Pending,In Progress,Insufficiency,Amber,Discrepancy Found,Clear,Failed,Completed',
             'comments' => 'nullable|string|max:5000',
@@ -193,7 +267,9 @@ class CaseController extends Controller
         }
 
         if (in_array($data['status'], ['Clear', 'Completed', 'Discrepancy Found', 'Failed', 'Amber'])) {
-            $update['completed_at'] = now();
+            $update['completed_at'] = $check->completed_at ?? now();
+        } else {
+            $update['completed_at'] = null;
         }
 
         $check->update($update);
@@ -203,7 +279,7 @@ class CaseController extends Controller
             $this->storeDocument($file, $case, $check, 'verified', 'admin');
         }
 
-        $case->update(['status' => $case->recalculateStatus()]);
+        $case->syncStatusAndCloseDate();
 
         return back()->with('success', 'Check updated successfully.');
     }
@@ -221,10 +297,10 @@ class CaseController extends Controller
         ]);
 
         $case->update([
-            'status' => $data['status'],
             'admin_notes' => $data['admin_notes'] ?? $case->admin_notes,
         ]);
+        $case->syncStatusAndCloseDate($data['status']);
 
-        return back()->with('success', 'Case updated.');
+        return back()->with('success', 'Case status and notes updated.');
     }
 }

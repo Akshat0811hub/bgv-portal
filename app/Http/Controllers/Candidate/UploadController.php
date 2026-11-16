@@ -42,12 +42,55 @@ class UploadController extends Controller
         ]);
 
         $case = $uploadToken->case;
+        $schemas = $this->schemasFor($case->checks->pluck('check_type'));
+
+        // Check whether the candidate actually entered any new data or uploaded any files
+        $rawCheckData = $this->pruneEmpty((array) $request->input('check_data', []));
+        $uploadedFilesByCheck = (array) ($request->allFiles()['check_files'] ?? []);
+        $hasNewFiles = ! empty($uploadedFilesByCheck);
+
+        // Enforce that any check which requires file upload has at least one document attached (either previously or in this submission)
+        foreach ($case->checks as $chk) {
+            $slug = $chk->check_type;
+            $checkSchema = $schemas[$slug] ?? [];
+            $checkHasFileField = collect($checkSchema)->flatten(1)->contains(
+                fn ($f) => ($f['type'] ?? '') === 'file' || str_starts_with($f['name'] ?? '', '_file')
+            );
+
+            $alreadyHasDocs = $chk->documents()->count() > 0;
+            $uploadedForThisCheck = ! empty($uploadedFilesByCheck[$slug] ?? []);
+
+            if (($checkHasFileField || $chk->status === 'Insufficiency') && ! $alreadyHasDocs && ! $uploadedForThisCheck) {
+                $checkLabel = ucwords(str_replace('_', ' ', $slug));
+                return back()
+                    ->withErrors(['upload' => "Please upload the required supporting document(s) for {$checkLabel} before submitting."])
+                    ->withInput();
+            }
+        }
+
+        // Detect if candidate changed any field vs pre-filled form_data
+        $changedAnyField = false;
+        foreach ($case->checks as $chk) {
+            $slug = $chk->check_type;
+            $existing = $this->pruneEmpty((array) ($chk->form_data ?? []));
+            $incoming = $rawCheckData[$slug] ?? [];
+            if (! empty($incoming) && $incoming != $existing) {
+                $changedAnyField = true;
+                break;
+            }
+        }
+
+        if (! $hasNewFiles && ! $changedAnyField) {
+            return back()
+                ->withErrors(['upload' => 'Please upload at least one required document or fill in your verification details before submitting.'])
+                ->withInput();
+        }
 
         $this->captureCheckSubmission($request, $case, 'candidate');
 
         // Mark token used and recalculate the case status.
         $uploadToken->update(['used' => true]);
-        $case->update(['status' => $case->recalculateStatus()]);
+        $case->syncStatusAndCloseDate();
 
         // Show a dedicated thank-you page (the link is now single-use, so we must
         // NOT redirect back to it — that would render the "expired" page).

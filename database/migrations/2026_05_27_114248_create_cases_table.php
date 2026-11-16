@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('case_number')->unique();
             $table->foreignId('client_organization_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->enum('status', [
                 'Pending', 'In Progress', 'Insufficiency', 'Amber',
                 'Discrepancy Found', 'On Hold', 'Completed - Green (Clear)', 'Completed - Discrepancy Found'

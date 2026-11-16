@@ -41,13 +41,10 @@
 
 {{-- Summary stats --}}
 @php
-    $total     = $cases->count();
-    $completed = $cases->filter(fn($c) => str_starts_with($c->status, 'Completed'))->count();
-    $inProgress= $cases->filter(fn($c) => in_array($c->status, ['Pending', 'In Progress']))->count();
-    $withTat   = $cases->filter(fn($c) => $c->case_start_date && $c->report_closed_date);
-    $avgTat    = $withTat->count()
-        ? round($withTat->avg(fn($c) => $c->case_start_date->diffInDays($c->report_closed_date)), 1)
-        : null;
+    $total      = $summaryStats['total'] ?? $cases->total();
+    $completed  = $summaryStats['completed'] ?? 0;
+    $inProgress = $summaryStats['active'] ?? 0;
+    $avgTat     = $summaryStats['avg_tat'] ?? null;
 @endphp
 
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
@@ -60,12 +57,29 @@
         <p class="text-2xl font-bold text-emerald-600">{{ $completed }}</p>
     </div>
     <div class="card p-4">
-        <p class="text-xs text-[#64748b] font-medium uppercase tracking-wider mb-1">Active</p>
+        <p class="text-xs text-[#64748b] font-medium uppercase tracking-wider mb-1">Active / Open</p>
         <p class="text-2xl font-bold text-blue-600">{{ $inProgress }}</p>
     </div>
     <div class="card p-4">
         <p class="text-xs text-[#64748b] font-medium uppercase tracking-wider mb-1">Avg TAT (Days)</p>
-        <p class="text-2xl font-bold text-[#0d9488]">{{ $avgTat ?? '—' }}</p>
+        <p class="text-2xl font-bold text-[#0d9488]">{{ $avgTat !== null ? $avgTat : '—' }}</p>
+    </div>
+</div>
+
+{{-- Per-page selector --}}
+<div class="flex items-center justify-between mb-3">
+    <p class="text-sm text-[#64748b]">
+        Showing {{ $cases->firstItem() ?? 0 }}–{{ $cases->lastItem() ?? 0 }} of {{ $cases->total() }} cases
+    </p>
+    <div class="flex items-center gap-2">
+        <span class="text-sm text-[#64748b]">Rows per page:</span>
+        @foreach([10, 25, 50] as $pp)
+        <a href="{{ request()->fullUrlWithQuery(['per_page' => $pp, 'page' => 1]) }}"
+           class="px-2.5 py-1 rounded text-sm font-medium transition-colors
+                  {{ ($perPage ?? 15) === $pp ? 'bg-[#0f2044] text-white' : 'bg-white border border-[#e2e8f0] text-[#374151] hover:bg-[#f8fafc]' }}">
+            {{ $pp }}
+        </a>
+        @endforeach
     </div>
 </div>
 
@@ -82,6 +96,7 @@
                 <th>Report Closed Date</th>
                 <th>Status</th>
                 <th class="text-right">TAT (Days)</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
@@ -169,10 +184,13 @@
                         <span class="text-[#94a3b8] font-normal">—</span>
                     @endif
                 </td>
+                <td class="text-right">
+                    <a href="{{ route('admin.cases.show', $case) }}" class="btn-outline btn-sm">Review</a>
+                </td>
             </tr>
             @empty
             <tr>
-                <td colspan="8" class="text-center py-12 text-[#64748b]">
+                <td colspan="9" class="text-center py-12 text-[#64748b]">
                     <svg class="w-10 h-10 mx-auto mb-3 text-[#cbd5e1]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                     </svg>
@@ -183,5 +201,11 @@
         </tbody>
     </table>
 </div>
+
+@if($cases->hasPages())
+<div class="mt-4">
+    {{ $cases->links() }}
+</div>
+@endif
 
 </x-layouts.app>

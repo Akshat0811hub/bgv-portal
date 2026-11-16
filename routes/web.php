@@ -51,6 +51,9 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
     Route::post('/cases', [AdminCase::class, 'store'])->name('cases.store');
     Route::get('/cases/{case}', [AdminCase::class, 'show'])->name('cases.show');
     Route::get('/cases/{case}/report', [AdminCase::class, 'report'])->name('cases.report');
+    Route::patch('/cases/{case}/candidate', [AdminCase::class, 'updateCandidate'])->name('cases.candidate.update');
+    Route::post('/cases/{case}/checks', [AdminCase::class, 'addCheck'])->name('cases.checks.store');
+    Route::delete('/cases/{case}/checks/{check}', [AdminCase::class, 'destroyCheck'])->name('cases.checks.destroy');
     Route::patch('/cases/{case}/checks/{check}', [AdminCase::class, 'updateCheck'])->name('cases.checks.update');
     Route::patch('/cases/{case}/status', [AdminCase::class, 'updateStatus'])->name('cases.status');
     Route::post('/cases/{case}/resend-link', [AdminCase::class, 'resendLink'])->name('cases.resend-link');
@@ -60,6 +63,7 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
     Route::get('/users', [AdminUser::class, 'index'])->name('users.index');
     Route::get('/users/create', [AdminUser::class, 'create'])->name('users.create');
     Route::post('/users', [AdminUser::class, 'store'])->name('users.store');
+    Route::patch('/users/{user}/toggle-status', [AdminUser::class, 'toggleStatus'])->name('users.toggle-status');
     Route::delete('/users/{user}', [AdminUser::class, 'destroy'])->name('users.destroy');
 
     // MIS Reports
@@ -76,6 +80,9 @@ Route::middleware(['auth', ClientMiddleware::class])->prefix('client')->name('cl
     Route::post('/cases', [ClientCase::class, 'store'])->name('cases.store');
     Route::get('/cases/{case}', [ClientCase::class, 'show'])->name('cases.show');
     Route::get('/cases/{case}/report', [ClientCase::class, 'report'])->name('cases.report');
+    Route::patch('/cases/{case}/candidate', [ClientCase::class, 'updateCandidate'])->name('cases.candidate.update');
+    Route::post('/cases/{case}/resend-link', [ClientCase::class, 'resendLink'])->name('cases.resend-link');
+    Route::post('/cases/{case}/checks/{check}/documents', [ClientCase::class, 'uploadCheckDocuments'])->name('cases.checks.documents');
 
     // Company profile
     Route::get('/profile', [ClientProfile::class, 'edit'])->name('profile.edit');
@@ -85,9 +92,12 @@ Route::middleware(['auth', ClientMiddleware::class])->prefix('client')->name('cl
     Route::get('/reports/mis', [ClientReport::class, 'mis'])->name('reports.mis');
 });
 
-// ── Document serving (auth required) ─────────────────────────────────────────
+// ── Document serving & removal (auth required) ───────────────────────────────
 Route::get('/documents/{document}/view', [DocumentController::class, 'view'])
     ->name('documents.view')
+    ->middleware('auth');
+Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])
+    ->name('documents.destroy')
     ->middleware('auth');
 
 // ── Candidate public upload (token-gated, no auth) ───────────────────────────

@@ -11,19 +11,33 @@ class ReportController extends Controller
 {
     public function mis(Request $request)
     {
-        $orgs  = ClientOrganization::orderBy('name')->get();
-        $orgId = $request->input('org_id');
+        $orgs    = ClientOrganization::orderBy('name')->get();
+        $orgId   = $request->input('org_id');
+        $perPage = in_array((int) $request->input('per_page'), [10, 25, 50]) ? (int) $request->input('per_page') : 15;
 
-        $cases = Cases::with('clientOrganization')
-            ->when($orgId, fn($q) => $q->where('client_organization_id', $orgId))
-            ->orderByDesc('created_at')
-            ->get();
+        $baseQuery = Cases::with('clientOrganization')
+            ->when($orgId, fn($q) => $q->where('client_organization_id', $orgId));
 
         if ($request->boolean('export')) {
-            return $this->exportCsv($cases, 'admin');
+            return $this->exportCsv((clone $baseQuery)->orderByDesc('created_at')->get(), 'admin');
         }
 
-        return view('admin.reports.mis', compact('cases', 'orgs', 'orgId'));
+        // Calculate summary statistics across the full filtered dataset (not just the current page)
+        $allForStats = (clone $baseQuery)->get(['status', 'case_start_date', 'report_closed_date']);
+        $withTat     = $allForStats->filter(fn($c) => $c->case_start_date && $c->report_closed_date);
+
+        $summaryStats = [
+            'total'     => $allForStats->count(),
+            'completed' => $allForStats->filter(fn($c) => str_starts_with($c->status, 'Completed'))->count(),
+            'active'    => $allForStats->filter(fn($c) => !str_starts_with($c->status, 'Completed'))->count(),
+            'avg_tat'   => $withTat->count()
+                ? round($withTat->avg(fn($c) => $c->case_start_date->diffInDays($c->report_closed_date)), 1)
+                : null,
+        ];
+
+        $cases = $baseQuery->orderByDesc('created_at')->paginate($perPage)->withQueryString();
+
+        return view('admin.reports.mis', compact('cases', 'orgs', 'orgId', 'perPage', 'summaryStats'));
     }
 
     public function updateCaseDate(Request $request, Cases $case)

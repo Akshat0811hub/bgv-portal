@@ -10,19 +10,31 @@ class ReportController extends Controller
 {
     public function mis(Request $request)
     {
-        $perPage = in_array((int) $request->input('per_page'), [5, 10, 25]) ? (int) $request->input('per_page') : 10;
+        $perPage = in_array((int) $request->input('per_page'), [5, 10, 25, 50]) ? (int) $request->input('per_page') : 10;
         $orgId   = auth()->user()->client_organization_id;
 
-        $casesQuery = Cases::where('client_organization_id', $orgId)
-            ->orderByDesc('created_at');
+        $baseQuery = Cases::where('client_organization_id', $orgId);
 
         if ($request->boolean('export')) {
-            return $this->exportCsv($casesQuery->get());
+            return $this->exportCsv((clone $baseQuery)->orderByDesc('created_at')->get());
         }
 
-        $cases = $casesQuery->paginate($perPage)->withQueryString();
+        // Calculate summary counters across the entire organization dataset, not just the current page
+        $allForStats = (clone $baseQuery)->get(['status', 'case_start_date', 'report_closed_date']);
+        $withTat     = $allForStats->filter(fn($c) => $c->case_start_date && $c->report_closed_date);
 
-        return view('client.reports.mis', compact('cases', 'perPage'));
+        $summaryStats = [
+            'total'     => $allForStats->count(),
+            'completed' => $allForStats->filter(fn($c) => str_starts_with($c->status, 'Completed'))->count(),
+            'active'    => $allForStats->filter(fn($c) => !str_starts_with($c->status, 'Completed'))->count(),
+            'avg_tat'   => $withTat->count()
+                ? round($withTat->avg(fn($c) => $c->case_start_date->diffInDays($c->report_closed_date)), 1)
+                : null,
+        ];
+
+        $cases = $baseQuery->orderByDesc('created_at')->paginate($perPage)->withQueryString();
+
+        return view('client.reports.mis', compact('cases', 'perPage', 'summaryStats'));
     }
 
     private function exportCsv($cases): \Symfony\Component\HttpFoundation\StreamedResponse

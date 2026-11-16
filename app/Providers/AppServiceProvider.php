@@ -14,8 +14,12 @@ class AppServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // In production, generate https links/assets (Hostinger serves over SSL).
-        if ($this->app->environment('production')) {
+        // In production or when accessed via HTTPS tunnel/proxy, generate https links/assets.
+        if (
+            $this->app->environment('production') ||
+            request()->header('X-Forwarded-Proto') === 'https' ||
+            str_starts_with((string) config('app.url'), 'https://')
+        ) {
             URL::forceScheme('https');
         }
 

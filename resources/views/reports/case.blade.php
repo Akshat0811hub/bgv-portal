@@ -18,6 +18,9 @@
         };
         $statuses = $case->checks->pluck('status');
         $cleared  = $statuses->filter(fn ($s) => str_contains((string) $s, 'Clear') || $s === 'Completed')->count();
+        $tatDays  = ($case->case_start_date && $case->report_closed_date)
+            ? $case->case_start_date->diffInDays($case->report_closed_date)
+            : null;
     @endphp
     <style>
         @page { margin: 38px 34px 58px 34px; }
@@ -50,17 +53,22 @@
         .badge { display: inline-block; padding: 2px 9px; border-radius: 9px; font-size: 9px; font-weight: bold; }
 
         /* check card */
-        .check { border: 1px solid #e2e8f0; border-radius: 7px; margin-bottom: 12px; page-break-inside: avoid; }
+        .check { border: 1px solid #e2e8f0; border-radius: 7px; margin-bottom: 14px; page-break-inside: avoid; }
         .check-head { background-color: #f8fafc; padding: 9px 12px; border-bottom: 1px solid #e2e8f0;
                       border-radius: 7px 7px 0 0; }
         .check-head .name { font-weight: bold; font-size: 12px; color: #0f2044; }
-        .check-body { padding: 4px 12px 10px; }
+        .check-body { padding: 6px 12px 12px; }
 
-        .section-title { font-weight: bold; color: #0d9488; font-size: 10.5px;
-                         margin: 9px 0 3px; text-transform: uppercase; letter-spacing: .3px; }
-        .kv td { padding: 3px 6px; vertical-align: top; }
-        .kv .k { color: #64748b; font-size: 9.5px; text-transform: uppercase; letter-spacing: .2px; width: 42%; }
-        .kv .v { color: #1e293b; font-size: 11px; font-weight: bold; }
+        .section-title { font-weight: bold; color: #0d9488; font-size: 10px;
+                         margin: 10px 0 4px; text-transform: uppercase; letter-spacing: .3px; }
+        .comp-table { border: 1px solid #e2e8f0; border-radius: 5px; overflow: hidden; margin-bottom: 6px; }
+        .comp-table th { background-color: #f8fafc; color: #475569; text-align: left;
+                         padding: 5px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; border-bottom: 1px solid #e2e8f0; }
+        .comp-table td { padding: 5px 8px; vertical-align: top; border-top: 1px solid #f1f5f9; font-size: 10.5px; }
+        .comp-table .k { color: #64748b; font-size: 9.5px; font-weight: bold; width: 30%; }
+        .comp-table .v-stated { color: #334155; width: 35%; }
+        .comp-table .v-verified { color: #0f2044; font-weight: bold; width: 35%; background-color: #f0fdf9; }
+        .comp-table .v-mismatch { color: #991b1b; font-weight: bold; width: 35%; background-color: #fef2f2; }
 
         .docs { margin-top: 8px; }
         .docs .h { color: #64748b; font-size: 9.5px; text-transform: uppercase; letter-spacing: .2px; margin-bottom: 3px; }
@@ -71,7 +79,7 @@
 
         .notes { background-color: #fffbeb; border: 1px solid #fde68a; padding: 7px 9px;
                  border-radius: 5px; font-size: 10.5px; margin-top: 8px; color: #713f12; }
-        .empty { color: #94a3b8; font-style: italic; font-size: 10.5px; }
+        .empty { color: #94a3b8; font-style: italic; font-size: 10.5px; padding: 4px 0; }
     </style>
 </head>
 <body>
@@ -89,6 +97,9 @@
         Overall status:
         <span class="badge" style="color:{{ $ot }}; background-color:{{ $ob }};">{{ $case->status }}</span>
         &nbsp;·&nbsp; {{ $cleared }}/{{ $case->checks->count() }} checks cleared
+        @if($tatDays !== null)
+            &nbsp;·&nbsp; Turnaround Time (TAT): <strong>{{ $tatDays }} {{ $tatDays === 1 ? 'Day' : 'Days' }}</strong>
+        @endif
     </div>
 </div>
 
@@ -109,30 +120,40 @@
     </tr>
     <tr>
         <td class="label">Phone</td><td class="val">{{ $case->candidate_phone ?: '—' }}</td>
-        <td class="label">Initiated</td><td class="val">{{ $case->created_at->format('d M Y') }}</td>
+        <td class="label">Start Date</td><td class="val">{{ optional($case->case_start_date)->format('d M Y') ?: $case->created_at->format('d M Y') }}</td>
     </tr>
     <tr>
         <td class="label">Designation</td><td class="val">{{ $case->candidate_designation ?: '—' }}</td>
         <td class="label">Report Closed</td><td class="val">{{ optional($case->report_closed_date)->format('d M Y') ?: '—' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Initiated On</td><td class="val">{{ $case->created_at->format('d M Y') }}</td>
+        <td class="label">TAT (Days)</td><td class="val">{{ $tatDays !== null ? $tatDays . ' Days' : '—' }}</td>
     </tr>
 </table>
 
 {{-- Summary --}}
 <h2>Verification Summary</h2>
 <table class="summary">
-    <tr><th style="width:55%">Check</th><th style="width:30%">Status</th><th style="width:15%">Documents</th></tr>
+    <tr>
+        <th style="width:45%">Check Type</th>
+        <th style="width:25%">Verification Status</th>
+        <th style="width:15%">Completed On</th>
+        <th style="width:15%">Documents</th>
+    </tr>
     @foreach($case->checks as $check)
     @php [$t, $b] = $badge($check->status); @endphp
     <tr>
-        <td>{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</td>
+        <td><strong>{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</strong></td>
         <td><span class="badge" style="color:{{ $t }}; background-color:{{ $b }};">{{ $check->status }}</span></td>
+        <td>{{ optional($check->completed_at)->format('d M Y') ?: '—' }}</td>
         <td>{{ $check->documents->count() }}</td>
     </tr>
     @endforeach
 </table>
 
 {{-- Detailed checks --}}
-<h2>Check Details</h2>
+<h2>Detailed Verification Findings</h2>
 @foreach($case->checks as $check)
 @php
     $schema = $schemas[$check->check_type] ?? [];
@@ -141,7 +162,14 @@
 <div class="check">
     <div class="check-head">
         <table><tr>
-            <td class="name">{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</td>
+            <td class="name">
+                {{ ucwords(str_replace('_', ' ', $check->check_type)) }}
+                @if($check->completed_at)
+                    <span style="font-weight:normal; font-size:9.5px; color:#64748b; margin-left:6px;">
+                        (Verified {{ $check->completed_at->format('d M Y') }})
+                    </span>
+                @endif
+            </td>
             <td style="text-align:right;">
                 <span class="badge" style="color:{{ $t }}; background-color:{{ $b }};">{{ $check->status }}</span>
             </td>
@@ -151,35 +179,65 @@
         @php $rendered = false; @endphp
         @foreach($schema as $section => $fields)
             @php
-                $values  = $check->form_data[$section] ?? [];
+                $statedValues   = $check->form_data[$section] ?? [];
+                $verifiedValues = $check->verified_data[$section] ?? [];
                 $visible = collect($fields)
                     ->reject(fn ($f) => ($f['type'] ?? '') === 'file' || str_starts_with($f['name'], '_file'))
-                    ->filter(fn ($f) => ($values[$f['name']] ?? '') !== '' && ($values[$f['name']] ?? null) !== null);
+                    ->filter(function ($f) use ($statedValues, $verifiedValues) {
+                        $sVal = $statedValues[$f['name']] ?? null;
+                        $vVal = $verifiedValues[$f['name']] ?? null;
+                        return ($sVal !== '' && $sVal !== null) || ($vVal !== '' && $vVal !== null);
+                    });
             @endphp
             @if($visible->isNotEmpty())
                 @php $rendered = true; @endphp
                 @if($section !== '_self')<div class="section-title">{{ $section }}</div>@endif
-                <table class="kv">
-                    @foreach($visible as $field)
-                    <tr>
-                        <td class="k">{{ $field['label'] ?? $field['name'] }}</td>
-                        <td class="v">{{ $values[$field['name']] }}</td>
-                    </tr>
-                    @endforeach
+                <table class="comp-table">
+                    <thead>
+                        <tr>
+                            <th>Parameter</th>
+                            <th>Candidate Stated Details</th>
+                            <th>Agency Verified Findings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($visible as $field)
+                        @php
+                            $sVal = $statedValues[$field['name']] ?? null;
+                            $vVal = $verifiedValues[$field['name']] ?? null;
+                            $hasS = ($sVal !== '' && $sVal !== null);
+                            $hasV = ($vVal !== '' && $vVal !== null);
+                            $isDiscrepancy = in_array($check->status, ['Discrepancy Found', 'Failed']) && $hasS && $hasV && strtolower(trim((string)$sVal)) !== strtolower(trim((string)$vVal));
+                        @endphp
+                        <tr>
+                            <td class="k">{{ $field['label'] ?? $field['name'] }}</td>
+                            <td class="v-stated">{{ $hasS ? $sVal : '—' }}</td>
+                            <td class="{{ $isDiscrepancy ? 'v-mismatch' : ($hasV ? 'v-verified' : 'v-stated') }}">
+                                @if($hasV)
+                                    {{ $vVal }}
+                                @elseif(in_array($check->status, ['Clear', 'Completed']) && $hasS)
+                                    Verified as Stated ✓
+                                @else
+                                    —
+                                @endif
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
                 </table>
             @endif
         @endforeach
-        @unless($rendered)<div class="empty">No details submitted for this check.</div>@endunless
+        @unless($rendered)<div class="empty">No structured details submitted or verified for this check.</div>@endunless
 
         {{-- Document links --}}
         @if($check->documents->isNotEmpty())
         <div class="docs">
-            <div class="h">Uploaded Documents ({{ $check->documents->count() }})</div>
+            <div class="h">Attached Evidence &amp; Documents ({{ $check->documents->count() }})</div>
             @foreach($check->documents as $doc)
             <div class="doc">
                 <a href="{{ route('documents.view', $doc) }}">{{ $doc->original_name }}</a>
                 <span class="meta2">
-                    &nbsp;· {{ $doc->formatted_size }}{{ $doc->uploaded_by_role === 'admin' ? ' · Verified' : '' }}
+                    &nbsp;· {{ $doc->formatted_size }}{{ $doc->uploaded_by_role === 'admin' ? ' · Agency Verified Proof' : ' · Candidate Submitted' }}
                 </span>
             </div>
             @endforeach
@@ -187,11 +245,18 @@
         @endif
 
         @if($check->comments)
-        <div class="notes"><strong>Verification notes:</strong> {{ $check->comments }}</div>
+        <div class="notes"><strong>Verifier Remarks / Notes:</strong> {{ $check->comments }}</div>
         @endif
     </div>
 </div>
 @endforeach
+
+@if($case->admin_notes)
+<h2>Overall Executive Summary / Remarks</h2>
+<div class="notes" style="margin-top:4px;">
+    {{ $case->admin_notes }}
+</div>
+@endif
 
 </body>
 </html>

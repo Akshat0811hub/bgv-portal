@@ -28,16 +28,17 @@ class LoginController extends Controller
             return back()->withErrors(['email' => 'Your account is pending verification.'])->withInput();
         }
 
-        if ($user->password_reset_required) {
-            return redirect()->route('password.set');
-        }
-
         if (!$user->isClient()) {
             auth()->logout();
             return back()->withErrors(['email' => 'Please use the admin portal to log in.'])->withInput();
         }
 
         $request->session()->regenerate();
+
+        if ($user->password_reset_required) {
+            return redirect()->route('password.set');
+        }
+
         return redirect()->route('client.dashboard');
     }
 
@@ -59,7 +60,17 @@ class LoginController extends Controller
             return back()->withErrors(['email' => 'Access denied. Not an admin account.'])->withInput();
         }
 
+        if (!$user->is_verified) {
+            auth()->logout();
+            return back()->withErrors(['email' => 'Your account is pending verification or has been deactivated.'])->withInput();
+        }
+
         $request->session()->regenerate();
+
+        if ($user->password_reset_required) {
+            return redirect()->route('password.set');
+        }
+
         return redirect()->route('admin.dashboard');
     }
 

@@ -43,16 +43,24 @@
                         @if($user->is_verified)
                         <span class="badge-clear">Active</span>
                         @else
-                        <span class="badge-pending">Pending</span>
+                        <span class="badge-failed">Deactivated</span>
                         @endif
                     </td>
                     <td class="text-sm text-[#64748b] whitespace-nowrap">{{ $user->created_at->format('d M Y') }}</td>
-                    <td>
-                        <form method="POST" action="{{ route('admin.users.destroy', $user) }}"
-                              onsubmit="return confirm('Delete this user?')">
-                            @csrf @method('DELETE')
-                            <button type="submit" class="btn-danger btn-sm">Delete</button>
-                        </form>
+                    <td class="text-right">
+                        <div class="flex items-center justify-end gap-2">
+                            <form method="POST" action="{{ route('admin.users.toggle-status', $user) }}">
+                                @csrf @method('PATCH')
+                                <button type="submit" class="btn-outline btn-sm">
+                                    {{ $user->is_verified ? 'Deactivate' : 'Activate' }}
+                                </button>
+                            </form>
+                            <form method="POST" action="{{ route('admin.users.destroy', $user) }}"
+                                  onsubmit="return confirm('Delete this user account? Any cases they created will be preserved under their organization.')">
+                                @csrf @method('DELETE')
+                                <button type="submit" class="btn-danger btn-sm">Delete</button>
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 @empty

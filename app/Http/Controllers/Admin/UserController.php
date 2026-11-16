@@ -24,7 +24,8 @@ class UserController extends Controller
 
     public function create()
     {
-        return view('admin.users.create');
+        $organizations = ClientOrganization::orderBy('name')->get();
+        return view('admin.users.create', compact('organizations'));
     }
 
     public function store(Request $request)
@@ -37,10 +38,11 @@ class UserController extends Controller
             'client_org_name' => 'required|string|max:150',
         ]);
 
-        // Create the organization (if new) and the user atomically, so the
-        // account is always persisted regardless of whether the email sends.
+        // Create the organization (case-insensitive match if existing) and the user atomically.
         $user = DB::transaction(function () use ($data) {
-            $org = ClientOrganization::firstOrCreate(['name' => $data['client_org_name']]);
+            $cleanOrgName = trim($data['client_org_name']);
+            $org = ClientOrganization::whereRaw('LOWER(name) = ?', [strtolower($cleanOrgName)])->first()
+                ?? ClientOrganization::create(['name' => $cleanOrgName]);
 
             return User::create([
                 'name' => $data['name'],
@@ -70,6 +72,21 @@ class UserController extends Controller
                 ->with('warning', "Account created for {$user->name}, but the credentials email could not be sent. Share the temporary password manually and check your mail settings.");
     }
 
+    public function toggleStatus(User $user)
+    {
+        if ($user->id === auth()->id()) {
+            return back()->with('error', 'You cannot deactivate your own account.');
+        }
+        if ($user->isAdmin()) {
+            return back()->with('error', 'Admin accounts cannot be modified here.');
+        }
+
+        $user->update(['is_verified' => ! $user->is_verified]);
+        $state = $user->is_verified ? 'activated' : 'deactivated';
+
+        return back()->with('success', "User account {$user->name} has been {$state}.");
+    }
+
     public function destroy(User $user)
     {
         if ($user->id === auth()->id()) {
@@ -78,8 +95,18 @@ class UserController extends Controller
         if ($user->isAdmin()) {
             return back()->with('error', 'Admin accounts cannot be deleted here.');
         }
+
+        // Preserve any cases created by this user under their organization before deleting
+        $fallbackUser = User::where('client_organization_id', $user->client_organization_id)
+            ->where('id', '!=', $user->id)
+            ->first() ?? auth()->user();
+
+        if ($fallbackUser) {
+            \App\Models\Cases::where('created_by', $user->id)->update(['created_by' => $fallbackUser->id]);
+        }
+
         $user->delete();
 
-        return back()->with('success', 'User deleted.');
+        return back()->with('success', 'User deleted. Organization cases have been preserved.');
     }
 }

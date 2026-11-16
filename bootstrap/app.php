@@ -12,6 +12,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'admin'  => \App\Http\Middleware\AdminMiddleware::class,
             'client' => \App\Http\Middleware\ClientMiddleware::class,
@@ -22,6 +24,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\ForcePasswordReset::class,
         ]);
+
+        // Redirect already-authenticated users to their respective dashboard instead of "/"
+        $middleware->redirectUsersTo(fn (Request $request) => $request->user()?->isAdmin()
+            ? route('admin.dashboard')
+            : route('client.dashboard')
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

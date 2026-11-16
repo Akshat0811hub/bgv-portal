@@ -41,22 +41,27 @@
         <div class="table-wrap border-0 rounded-t-none">
             <table class="data-table">
                 <thead>
-                    <tr><th>Case No.</th><th>Candidate</th><th>Status</th><th>Created</th><th></th></tr>
+                    <tr><th>Case No.</th><th>Candidate</th><th>Progress</th><th>Status</th><th>Created</th><th class="text-right">Action</th></tr>
                 </thead>
                 <tbody>
                     @forelse($cases as $case)
+                    @php
+                        $totalChecks = $case->checks->count();
+                        $doneChecks  = $case->checks->whereIn('status', ['Clear','Completed','Failed','Discrepancy Found','Amber'])->count();
+                    @endphp
                     <tr>
-                        <td><span class="font-mono text-xs font-semibold text-[#0f2044]">{{ $case->case_number }}</span></td>
+                        <td><a href="{{ route('client.cases.show', $case) }}" class="font-mono text-xs font-bold text-[#0f2044] hover:text-[#0d9488] transition-colors">{{ $case->case_number }}</a></td>
                         <td>
-                            <div class="font-medium text-sm">{{ $case->candidate_name }}</div>
-                            <div class="text-xs text-[#64748b]">{{ $case->candidate_designation }}</div>
+                            <div class="font-semibold text-sm text-[#1e293b]">{{ $case->candidate_name }}</div>
+                            <div class="text-xs text-[#64748b]">{{ $case->candidate_designation ?: $case->candidate_email }}</div>
                         </td>
+                        <td><span class="text-xs font-semibold text-[#475569]">{{ $doneChecks }}/{{ $totalChecks }} checks</span></td>
                         <td><x-status-badge :status="$case->status" /></td>
-                        <td class="text-xs text-[#64748b]">{{ $case->created_at->format('d M Y') }}</td>
-                        <td><a href="{{ route('client.cases.show', $case) }}" class="btn-outline btn-sm">View</a></td>
+                        <td class="text-xs text-[#64748b] whitespace-nowrap">{{ $case->created_at->format('d M Y') }}</td>
+                        <td class="text-right"><a href="{{ route('client.cases.show', $case) }}" class="btn-outline btn-sm">View</a></td>
                     </tr>
                     @empty
-                    <tr><td colspan="5" class="text-center py-10 text-[#64748b] text-sm">No cases created yet.</td></tr>
+                    <tr><td colspan="6" class="text-center py-10 text-[#64748b] text-sm">No cases created yet.</td></tr>
                     @endforelse
                 </tbody>
             </table>

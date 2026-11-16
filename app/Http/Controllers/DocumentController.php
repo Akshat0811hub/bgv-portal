@@ -2,21 +2,25 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Models\Document;
+use Illuminate\Support\Facades\Storage;
 
 class DocumentController extends Controller
 {
-    public function view(\App\Models\Document $document)
+    public function view(Document $document)
     {
         $user = auth()->user();
-        // Admin sees all; clients see only their own case documents
-        if (!$user->isAdmin() && $document->case->created_by !== $user->id) {
+        // Admin sees all; clients see only their organization's case documents
+        if (! $user->isAdmin() && $document->case->client_organization_id !== $user->client_organization_id) {
             abort(403);
         }
 
-        $path = storage_path('app/private/' . $document->stored_path);
+        $disk = Storage::disk('local');
+        if (! $disk->exists($document->stored_path)) {
+            abort(404);
+        }
 
-        if (!file_exists($path)) abort(404);
+        $path = $disk->path($document->stored_path);
 
         // Strip any characters that could break the Content-Disposition header
         $safeName = preg_replace('/[\x00-\x1F\x7F"\\\\]/', '_', $document->original_name);
@@ -28,5 +32,28 @@ class DocumentController extends Controller
             'Content-Type'        => $safeMime,
             'Content-Disposition' => 'inline; filename="' . $safeName . '"',
         ]);
+    }
+
+    public function destroy(Document $document)
+    {
+        $user = auth()->user();
+        // Admin can delete any document; client can only delete documents they uploaded while the case is not completed
+        $canClientDelete = $user->isClient()
+            && $document->case->client_organization_id === $user->client_organization_id
+            && $document->uploaded_by_role === 'client'
+            && ! $document->case->isCompletedStatus();
+
+        if (! $user->isAdmin() && ! $canClientDelete) {
+            abort(403);
+        }
+
+        $disk = Storage::disk('local');
+        if ($disk->exists($document->stored_path)) {
+            $disk->delete($document->stored_path);
+        }
+
+        $document->delete();
+
+        return back()->with('success', 'Document removed successfully.');
     }
 }

@@ -69,8 +69,8 @@
                         <div class="text-xs text-[#64748b] mt-0.5">Candidate fills the details and uploads documents themselves.</div>
                     </div>
                 </label>
-                <label class="js-mode-label flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-[#e2e8f0]" data-mode="admin_upload">
-                    <input type="radio" name="mode" value="admin_upload" class="js-mode mt-0.5 text-[#0d9488] focus:ring-[#0d9488]" @checked(old('mode') === 'admin_upload')>
+                <label class="js-mode-label flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all border-[#e2e8f0]" data-mode="self_upload">
+                    <input type="radio" name="mode" value="self_upload" class="js-mode mt-0.5 text-[#0d9488] focus:ring-[#0d9488]" @checked(in_array(old('mode'), ['self_upload', 'admin_upload']))>
                     <div>
                         <div class="font-medium text-sm text-[#1e293b]">I'll enter the details now</div>
                         <div class="text-xs text-[#64748b] mt-0.5">Enter known details and upload documents on the candidate's behalf.</div>
@@ -86,7 +86,10 @@
                     <h2 class="font-semibold text-[#0f2044]">Select Verification Checks</h2>
                     <p class="text-xs text-[#64748b] mt-0.5">Choose which checks to run</p>
                 </div>
-                <span class="text-sm font-semibold text-[#0d9488]" id="checks-count">0 selected</span>
+                <div class="flex items-center gap-3">
+                    <button type="button" id="toggle-all-checks" class="text-xs font-medium text-[#64748b] hover:text-[#0d9488] transition-colors">Select All</button>
+                    <span class="badge bg-[#0d9488]/10 text-[#0d9488]" id="checks-count">0 selected</span>
+                </div>
             </div>
             <div class="card-body">
                 <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
@@ -126,12 +129,13 @@
             <span>The candidate will receive an email with a secure link to submit their documents. Anything you enter above is pre-filled for them.</span>
         </div>
 
-        <div class="flex items-center gap-3">
-            <button type="submit" id="submit-btn" class="btn-primary btn-lg" disabled>
+        <div class="flex items-center gap-2.5 pt-1">
+            <button type="submit" id="submit-btn" class="btn-primary !px-5 !py-2" disabled>
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 <span class="js-label-send">Create Case &amp; Notify Candidate</span>
                 <span class="js-label-upload" style="display:none">Create Case</span>
             </button>
-            <a href="{{ route('admin.cases.index') }}" class="btn-outline btn-lg">Cancel</a>
+            <a href="{{ route('admin.cases.index') }}" class="btn-outline !px-4 !py-2">Cancel</a>
         </div>
     </form>
 </div>
@@ -166,6 +170,9 @@
         var countEl = document.getElementById('checks-count');
         if (countEl) countEl.textContent = count + ' selected';
 
+        var toggleBtn = document.getElementById('toggle-all-checks');
+        if (toggleBtn) toggleBtn.textContent = (count === boxes.length && boxes.length > 0) ? 'Clear All' : 'Select All';
+
         var section = document.getElementById('check-details-section');
         if (section) section.style.display = count > 0 ? '' : 'none';
 
@@ -197,6 +204,15 @@
         document.querySelectorAll('.js-mode').forEach(function (radio) {
             radio.addEventListener('change', refreshMode);
         });
+        var toggleBtn = document.getElementById('toggle-all-checks');
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', function () {
+                var boxes = document.querySelectorAll('.js-check');
+                var allChecked = Array.from(boxes).every(function (b) { return b.checked; });
+                boxes.forEach(function (b) { b.checked = !allChecked; });
+                refreshChecks();
+            });
+        }
         refreshChecks();
         refreshMode();
     }

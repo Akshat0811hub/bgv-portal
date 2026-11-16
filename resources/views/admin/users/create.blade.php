@@ -60,9 +60,17 @@
 
                 <div>
                     <label class="form-label">Company / Organization Name</label>
-                    <input name="client_org_name" type="text" class="form-input @error('client_org_name') border-red-400 @enderror"
-                           value="{{ old('client_org_name') }}" placeholder="Acme Corp" required>
-                    <p class="form-hint">A new organization will be created if this name doesn't exist.</p>
+                    <input name="client_org_name" type="text" list="existing-orgs"
+                           class="form-input @error('client_org_name') border-red-400 @enderror"
+                           value="{{ old('client_org_name') }}" placeholder="Select an existing company or type a new name…" required>
+                    @if(isset($organizations) && $organizations->isNotEmpty())
+                    <datalist id="existing-orgs">
+                        @foreach($organizations as $org)
+                            <option value="{{ $org->name }}"></option>
+                        @endforeach
+                    </datalist>
+                    @endif
+                    <p class="form-hint">Pick an existing organization from the dropdown list to share cases across HR users, or type a new name to create a new organization.</p>
                     @error('client_org_name') <p class="form-error">{{ $message }}</p> @enderror
                 </div>
 

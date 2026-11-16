@@ -16,8 +16,16 @@
     <div class="card-body py-4">
         <form method="GET" class="flex flex-col sm:flex-row gap-3">
             <input type="text" name="search" value="{{ request('search') }}"
-                   placeholder="Search by name, case number, email…"
+                   placeholder="Search by candidate name, case number, email, phone…"
                    class="form-input flex-1">
+            @if(isset($organizations))
+            <select name="org" class="form-select sm:w-48">
+                <option value="">All Organizations</option>
+                @foreach($organizations as $org)
+                <option value="{{ $org->id }}" @selected(request('org') == $org->id)>{{ $org->name }}</option>
+                @endforeach
+            </select>
+            @endif
             <select name="status" class="form-select sm:w-52">
                 <option value="">All Statuses</option>
                 @foreach(['Pending', 'In Progress', 'Insufficiency', 'Amber', 'On Hold', 'Completed - Green (Clear)', 'Completed - Discrepancy Found'] as $s)
@@ -25,7 +33,7 @@
                 @endforeach
             </select>
             <button type="submit" class="btn-primary">Filter</button>
-            @if(request()->hasAny(['search', 'status']))
+            @if(request()->hasAny(['search', 'status', 'org']))
             <a href="{{ route('admin.cases.index') }}" class="btn-outline">Clear</a>
             @endif
         </form>
@@ -40,34 +48,41 @@
                     <th>Case No.</th>
                     <th>Candidate</th>
                     <th>Organization</th>
-                    <th>Checks</th>
+                    <th>Progress</th>
                     <th>Status</th>
                     <th>Created</th>
-                    <th></th>
+                    <th class="text-right">Action</th>
                 </tr>
             </thead>
             <tbody>
                 @forelse($cases as $case)
+                @php
+                    $totalChecks = $case->checks->count();
+                    $doneChecks  = $case->checks->whereIn('status', ['Clear','Completed','Failed','Discrepancy Found','Amber'])->count();
+                @endphp
                 <tr>
-                    <td><span class="font-mono text-xs font-semibold text-[#0f2044]">{{ $case->case_number }}</span></td>
+                    <td><a href="{{ route('admin.cases.show', $case) }}" class="font-mono text-xs font-bold text-[#0f2044] hover:text-[#0d9488] transition-colors">{{ $case->case_number }}</a></td>
                     <td>
-                        <div class="font-medium">{{ $case->candidate_name }}</div>
+                        <div class="font-semibold text-[#1e293b]">{{ $case->candidate_name }}</div>
                         <div class="text-xs text-[#64748b]">{{ $case->candidate_email }}</div>
                     </td>
-                    <td class="text-sm text-[#64748b]">{{ $case->clientOrganization->name ?? '—' }}</td>
+                    <td class="text-sm text-[#475569] font-medium">{{ $case->clientOrganization->name ?? '—' }}</td>
                     <td>
-                        <div class="flex items-center gap-1.5">
-                            @php
-                                $checkStatuses = $case->checks->pluck('status');
-                                $done = $checkStatuses->whereIn('status', ['Clear','Completed','Failed','Discrepancy Found','Amber'])->count();
-                            @endphp
-                            <span class="text-sm font-medium">{{ $case->checks->count() }}</span>
-                            <span class="text-xs text-[#94a3b8]">checks</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-semibold text-[#0f2044]">{{ $doneChecks }}/{{ $totalChecks }}</span>
+                            <span class="text-xs text-[#94a3b8]">verified</span>
                         </div>
                     </td>
                     <td><x-status-badge :status="$case->status" /></td>
                     <td class="text-sm text-[#64748b] whitespace-nowrap">{{ $case->created_at->format('d M Y') }}</td>
-                    <td><a href="{{ route('admin.cases.show', $case) }}" class="btn-primary btn-sm">Review</a></td>
+                    <td class="text-right">
+                        <div class="flex items-center justify-end gap-1.5">
+                            @if(str_starts_with($case->status, 'Completed'))
+                                <a href="{{ route('admin.cases.report', $case) }}" class="btn-outline btn-sm" title="Download PDF Report">PDF</a>
+                            @endif
+                            <a href="{{ route('admin.cases.show', $case) }}" class="btn-primary btn-sm">Review</a>
+                        </div>
+                    </td>
                 </tr>
                 @empty
                 <tr>

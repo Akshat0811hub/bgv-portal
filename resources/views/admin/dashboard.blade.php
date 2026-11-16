@@ -2,21 +2,45 @@
 
 {{-- Stats row — clickable status filters --}}
 @php
+$totalAll = array_sum($stats);
 $statCards = [
-    ['label' => 'Pending',       'key' => 'Pending',                         'value' => $stats['pending'],       'color' => 'bg-amber-100 text-amber-600'],
-    ['label' => 'Insufficiency', 'key' => 'Insufficiency',                   'value' => $stats['insufficiency'], 'color' => 'bg-purple-100 text-purple-600'],
-    ['label' => 'Amber',         'key' => 'Amber',                           'value' => $stats['amber'],         'color' => 'bg-orange-100 text-orange-600'],
-    ['label' => 'Discrepancy',   'key' => 'Completed - Discrepancy Found',   'value' => $stats['discrepancy'],   'color' => 'bg-red-100 text-red-600'],
-    ['label' => 'Green',         'key' => 'Completed - Green (Clear)',       'value' => $stats['green'],         'color' => 'bg-emerald-100 text-emerald-600'],
-    ['label' => 'On Hold',       'key' => 'On Hold',                         'value' => $stats['on_hold'],       'color' => 'bg-slate-100 text-slate-600'],
+    ['label' => 'Pending',       'key' => 'Pending',                         'value' => $stats['pending'],       'dot' => 'bg-amber-500',   'bg' => 'bg-amber-50 text-amber-700'],
+    ['label' => 'In Progress',   'key' => 'In Progress',                     'value' => $stats['in_progress'] ?? 0, 'dot' => 'bg-blue-500 animate-pulse', 'bg' => 'bg-blue-50 text-blue-700'],
+    ['label' => 'Insufficiency', 'key' => 'Insufficiency',                   'value' => $stats['insufficiency'], 'dot' => 'bg-purple-500',  'bg' => 'bg-purple-50 text-purple-700'],
+    ['label' => 'Amber',         'key' => 'Amber',                           'value' => $stats['amber'],         'dot' => 'bg-orange-500',  'bg' => 'bg-orange-50 text-orange-700'],
+    ['label' => 'Discrepancy',   'key' => 'Completed - Discrepancy Found',   'value' => $stats['discrepancy'],   'dot' => 'bg-red-500',     'bg' => 'bg-red-50 text-red-700'],
+    ['label' => 'Green (Clear)', 'key' => 'Completed - Green (Clear)',       'value' => $stats['green'],         'dot' => 'bg-emerald-500', 'bg' => 'bg-emerald-50 text-emerald-700'],
+    ['label' => 'On Hold',       'key' => 'On Hold',                         'value' => $stats['on_hold'],       'dot' => 'bg-slate-400',   'bg' => 'bg-slate-100 text-slate-700'],
 ];
 @endphp
-<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Verification Operations Center</h1>
+        <p class="page-subtitle">Real-time overview of all candidate background verification cases</p>
+    </div>
+    <div class="flex items-center gap-2.5">
+        <a href="{{ route('admin.reports.mis') }}" class="btn-outline">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            MIS Report
+        </a>
+        <a href="{{ route('admin.cases.create') }}" class="btn-primary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Create Case
+        </a>
+    </div>
+</div>
+
+<div class="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-7 gap-3.5 mb-6">
     @foreach($statCards as $card)
-    <a href="{{ route('admin.dashboard', ['status' => $card['key']]) }}"
-       class="card p-4 transition-all hover:shadow-md {{ request('status') === $card['key'] ? 'ring-2 ring-[#0d9488]' : '' }}">
-        <div class="text-xs text-[#64748b] font-medium">{{ $card['label'] }}</div>
-        <div class="text-3xl font-bold text-[#0f2044] mt-1">{{ $card['value'] }}</div>
+    @php $isActive = request('status') === $card['key']; @endphp
+    <a href="{{ $isActive ? route('admin.dashboard', request()->except('status')) : route('admin.dashboard', array_merge(request()->query(), ['status' => $card['key']])) }}"
+       class="card p-4 transition-all duration-200 hover:-translate-y-0.5 group {{ $isActive ? 'ring-2 ring-[#0d9488] bg-teal-50/40' : '' }}">
+        <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] text-slate-500 font-semibold uppercase tracking-wider group-hover:text-[#0f2044] transition-colors">{{ $card['label'] }}</span>
+            <span class="w-2 h-2 rounded-full {{ $card['dot'] }}"></span>
+        </div>
+        <div class="text-2xl font-bold text-[#0f2044] tracking-tight">{{ $card['value'] }}</div>
     </a>
     @endforeach
 </div>
