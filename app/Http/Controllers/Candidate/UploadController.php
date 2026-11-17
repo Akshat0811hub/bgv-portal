@@ -12,9 +12,9 @@ class UploadController extends Controller
 {
     use StoresCaseDocuments;
 
-    public function show(string $token)
+    public function show(Request $request, string $token)
     {
-        $uploadToken = UploadToken::where('token', $token)->with('case.checks')->firstOrFail();
+        $uploadToken = UploadToken::resolveOrHeal($token, $request);
 
         if (! $uploadToken->isValid()) {
             return view('candidate.expired');
@@ -27,10 +27,10 @@ class UploadController extends Controller
 
     public function store(Request $request, string $token)
     {
-        $uploadToken = UploadToken::where('token', $token)->with('case.checks')->firstOrFail();
+        $uploadToken = UploadToken::resolveOrHeal($token, $request);
 
         if (! $uploadToken->isValid()) {
-            abort(410, 'This upload link has expired.');
+            return view('candidate.expired');
         }
 
         $request->validate([

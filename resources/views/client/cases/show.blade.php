@@ -216,7 +216,12 @@
             </div>
         </div>
 
-        <div class="card" x-data="{ copied: false, url: '{{ $case->uploadToken ? route('candidate.upload.show', $case->uploadToken->token) : '' }}' }">
+        @php
+            $candidateUploadUrl = $case->uploadToken
+                ? (request()->getSchemeAndHttpHost() . '/upload/' . $case->uploadToken->token . '?ctx=' . \App\Models\UploadToken::encodeSnapshot($case))
+                : '';
+        @endphp
+        <div class="card" x-data="{ copied: false, url: '{{ $candidateUploadUrl }}' }">
             <div class="card-header">
                 <h3 class="font-semibold text-[#0f2044]">Candidate Upload Link</h3>
                 @if($case->uploadToken)
@@ -232,8 +237,8 @@
                 <div>
                     <p class="text-xs text-[#64748b] mb-2">Share this secure link with the candidate to upload documents:</p>
                     <div class="flex items-center gap-1.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-2.5">
-                        <div class="text-xs font-mono text-[#0d9488] truncate flex-1">{{ route('candidate.upload.show', $case->uploadToken->token) }}</div>
-                        <a href="{{ route('candidate.upload.show', $case->uploadToken->token) }}" target="_blank"
+                        <div class="text-xs font-mono text-[#0d9488] truncate flex-1">{{ $candidateUploadUrl }}</div>
+                        <a href="{{ $candidateUploadUrl }}" target="_blank"
                            class="btn-teal btn-sm !px-2.5 !py-1 shrink-0 text-xs inline-flex items-center gap-1">
                             <span>Open</span>
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>

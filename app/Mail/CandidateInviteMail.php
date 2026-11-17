@@ -41,11 +41,16 @@ class CandidateInviteMail extends Mailable
             ->map(fn ($c) => ucwords(str_replace('_', ' ', $c->check_type)))
             ->values();
 
+        $baseUrl = (app()->bound('request') && request()->getHttpHost())
+            ? (request()->getSchemeAndHttpHost() . '/upload/' . $this->token)
+            : route('candidate.upload.show', $this->token);
+        $uploadUrl = $baseUrl . '?ctx=' . \App\Models\UploadToken::encodeSnapshot($this->case);
+
         return new Content(
             view: 'emails.candidate-invite',
             with: [
                 'case' => $this->case,
-                'uploadUrl' => route('candidate.upload.show', $this->token),
+                'uploadUrl' => $uploadUrl,
                 'organizationName' => $this->case->clientOrganization->name ?? 'Your Hiring Organization',
                 'checkNames' => $checkNames,
                 'expiresAt' => optional($this->case->uploadToken)->expires_at,
