@@ -43,7 +43,7 @@
 <h2>Verifier remarks</h2><div class="remarks">{{ $check->comments ?: 'No remarks recorded.' }}</div>
 <h2>Supporting evidence / {{ $check->documents->count() }} files</h2>
 @if($check->documents->isNotEmpty())
-<p class="muted">The following files are reproduced on the next pages, before the next verification check.</p>
-@foreach($check->documents as $document)<div class="file-row"><strong>{{ $loop->iteration }}. {{ $document->original_name }}</strong><br><span class="muted">Uploaded by {{ ucfirst($document->uploaded_by_role ?: 'Unknown') }} / {{ $document->formatted_size }}</span></div>@endforeach
+<p class="muted">Available previews follow this check. Files without a preview are listed with links to their originals. Sign in to Orbit Verify with access to this case to open original files.</p>
+@include('reports.document-list', ['documents' => $check->documents])
 @else<p class="empty">No supporting files uploaded for this check.</p>@endif
 </body></html>

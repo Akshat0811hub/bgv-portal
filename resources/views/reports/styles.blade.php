@@ -32,7 +32,10 @@ table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .check-top { margin: 24px 0 15px; border-bottom: 2px solid #0d9488; padding-bottom: 13px; }
 .check-top h1 { font-size: 21px; margin: 6px 0; color: #0f2044; }
 .eyebrow { font-size: 8px; color: #0d9488; letter-spacing: 1px; }
-.file-row { border-bottom: 1px solid #e2e8f0; padding: 9px 0; font-size: 9px; word-wrap: break-word; }
+.file-row { border-bottom: 1px solid #e2e8f0; padding: 9px 0; font-size: 9px; word-wrap: break-word; page-break-inside: avoid; }
+.original-link { color: #0d766e; text-decoration: underline; font-size: 8px; }
+.evidence-included { color: #047857; font-size: 8px; }
+.evidence-linked { color: #a16207; font-size: 8px; }
 .empty { color: #748399; padding: 12px; background: #f8fafc; }
 thead { display: table-header-group; } tr { page-break-inside: avoid; }
 </style>

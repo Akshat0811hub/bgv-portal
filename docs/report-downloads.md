@@ -1,7 +1,8 @@
 # Large combined PDF downloads
 
-The same report download button returns a single PDF containing all supported
-documents. On Vercel, PDFs larger than 3 MB use an authenticated download page:
+The same report download button returns a single PDF containing available document
+previews and original-file links for files that cannot be previewed. Missing originals
+are named and marked unavailable. On Vercel, PDFs larger than 3 MB use an authenticated download page:
 the server stores the finished report temporarily in the database, the browser
 fetches 1 MB parts, verifies their combined size and SHA-256 checksum, and saves
 one PDF. No evidence is removed to fit a response limit. Other hosting platforms

@@ -9,6 +9,14 @@
     Text/date/radio values post as:  check_data[{slug}][{section}][{field}]
     File fields post as:             check_files[{slug}][{field}][]   (multiple)
 --}}
+@php
+    // Every check needs an evidence uploader, including text-only custom templates.
+    $hasFileField = collect($schema)->flatMap(fn ($fields) => $fields)
+        ->contains(fn ($field) => ($field['type'] ?? '') === 'file' || str_starts_with($field['name'] ?? '', '_file'));
+    if (!$hasFileField) {
+        $schema['_self'][] = ['name' => '_file', 'label' => 'Upload Supporting Documents', 'type' => 'file'];
+    }
+@endphp
 <div class="space-y-5">
     @foreach($schema as $section => $fields)
         @php $isSelf = ($section === '_self'); @endphp

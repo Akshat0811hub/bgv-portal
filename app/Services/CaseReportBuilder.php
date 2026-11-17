@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Exceptions\ReportDocumentException;
 use App\Models\Cases;
 use App\Models\Check;
 use App\Models\Document;
@@ -11,6 +10,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use setasign\Fpdi\Fpdi;
 use setasign\Fpdi\PdfParser\StreamReader;
+use setasign\Fpdi\PdfReader\PageBoundaries;
 
 class CaseReportBuilder
 {
@@ -31,23 +31,33 @@ class CaseReportBuilder
         foreach ($case->checks as $index => $check) {
             $schema = $check->effectiveSchema($schemas[$check->check_type] ?? []);
             $number = $index + 1;
-            $this->appendPdf($merged, $this->renderPdf('reports.check', compact('case', 'check', 'schema', 'number')));
+            $documentResults = $check->documents->mapWithKeys(fn ($document) => [$document->id => $this->prepareDocument($document)]);
+            $this->appendPdf($merged, $this->renderPdf('reports.check', compact('case', 'check', 'schema', 'number', 'documentResults')));
             foreach ($check->documents as $document) {
-                $this->appendDocument($merged, $document, ucwords(str_replace('_', ' ', $check->check_type)));
+                $this->appendDocument($merged, $document, $documentResults[$document->id], ucwords(str_replace('_', ' ', $check->check_type)));
             }
         }
         $checkIds = $case->checks->pluck('id')->all();
-        foreach ($documents->reject(fn ($doc) => in_array($doc->case_check_id, $checkIds, true)) as $document) {
-            $this->appendDocument($merged, $document, 'General case documents');
+        $generalDocuments = $documents->reject(fn ($doc) => in_array($doc->case_check_id, $checkIds, true));
+        if ($generalDocuments->isNotEmpty()) {
+            $documentResults = $generalDocuments->mapWithKeys(fn ($document) => [$document->id => $this->prepareDocument($document)]);
+            $this->appendPdf($merged, $this->renderPdf('reports.general-documents', [
+                'case' => $case, 'documents' => $generalDocuments, 'documentResults' => $documentResults,
+            ]));
+            foreach ($generalDocuments as $document) {
+                $this->appendDocument($merged, $document, $documentResults[$document->id], 'General case documents');
+            }
         }
 
         return $merged->Output('S');
     }
 
-    private function appendDocument(CaseReportPdf $merged, Document $document, string $checkName): void
+    private function prepareDocument(Document $document): array
     {
+        $originalAvailable = false;
         try {
             $bytes = $this->readDocument($document);
+            $originalAvailable = true;
             $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
             $extension = strtolower(pathinfo($document->original_name, PATHINFO_EXTENSION));
             if ($mime === 'application/pdf' || $extension === 'pdf') {
@@ -64,17 +74,22 @@ class CaseReportBuilder
                 $bytes = $this->converter->convert($bytes, $document->original_name);
             }
             $this->validatePdf($bytes);
-            $this->appendPdf($merged, $bytes, [
+
+            return ['pdf' => $bytes, 'status' => 'embedded'];
+        } catch (\Throwable $exception) {
+            Log::warning('Report document preview unavailable', ['document_id' => $document->id, 'reason' => $exception->getMessage()]);
+
+            return ['pdf' => null, 'status' => $originalAvailable ? 'linked' : 'missing'];
+        }
+    }
+
+    private function appendDocument(CaseReportPdf $merged, Document $document, array $result, string $checkName): void
+    {
+        if ($result['pdf'] !== null) {
+            $this->appendPdf($merged, $result['pdf'], [
                 'check' => $checkName, 'name' => $document->original_name,
                 'uploader' => ucfirst($document->uploaded_by_role ?: 'Unknown'),
             ]);
-        } catch (\Throwable $exception) {
-            Log::warning('Combined report document failed', ['document_id' => $document->id, 'reason' => $exception->getMessage()]);
-            throw new ReportDocumentException(
-                'The complete report could not include "'.$document->original_name.'". '.
-                'Check that the file is readable and not password protected. For Word/ODF files, ask the administrator to configure the document converter. No incomplete report was downloaded.',
-                previous: $exception,
-            );
         }
     }
 
@@ -118,7 +133,8 @@ class CaseReportBuilder
     {
         $count = $merged->setSourceFile(StreamReader::createByString($bytes));
         for ($page = 1; $page <= $count; $page++) {
-            $template = $merged->importPage($page);
+            // Keep clickable original-file links in generated report sections.
+            $template = $merged->importPage($page, PageBoundaries::CROP_BOX, true, $evidence === null);
             $size = $merged->getTemplateSize($template);
             if ($evidence === null) {
                 $merged->AddPage($size['orientation'], [$size['width'], $size['height']]);

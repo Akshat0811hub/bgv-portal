@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Exceptions\ReportDocumentException;
 use App\Models\CaseCheck;
 use App\Models\Cases;
 use App\Models\ClientOrganization;
@@ -70,7 +69,7 @@ class CaseReportBuilderTest extends TestCase
         $this->document(null, 'general-proof.pdf', $this->fixturePdf('GENERAL-PROOF'), 'client');
 
         $pages = $this->pages(app(CaseReportBuilder::class)->build($this->case));
-        $this->assertCount(count($baseline) + 7, $pages);
+        $this->assertCount(count($baseline) + 8, $pages); // Seven proof pages and the general-document index.
         $proofPages = array_values(array_filter($pages, fn ($page) => str_contains($page, 'Document page ')));
         $this->assertCount(7, $proofPages);
         $this->assertStringContainsString('CANDIDATE-DEGREE-1', $proofPages[0]);
@@ -139,23 +138,62 @@ class CaseReportBuilderTest extends TestCase
         }
     }
 
-    public function test_unavailable_document_fails_instead_of_returning_an_incomplete_report(): void
+    public function test_missing_file_is_listed_without_blocking_other_evidence(): void
     {
         $this->document($this->education, 'missing-proof.pdf', '', 'candidate', true);
-        $this->expectException(ReportDocumentException::class);
-        $this->expectExceptionMessage('missing-proof.pdf');
-        app(CaseReportBuilder::class)->build($this->case);
+        $this->document($this->education, 'available-proof.pdf', $this->fixturePdf('AVAILABLE'), 'client');
+        $pdf = app(CaseReportBuilder::class)->build($this->case);
+        $pages = $this->pages($pdf);
+        $this->assertStringContainsString('AVAILABLE-1', implode("\n", $pages));
+        $this->assertStringContainsString('Original file unavailable', view('reports.document-list', [
+            'documents' => $this->education->documents,
+            'documentResults' => $this->education->documents->mapWithKeys(fn ($document) => [$document->id => ['status' => 'missing']]),
+        ])->render());
     }
 
-    public function test_unreadable_pdf_cannot_silently_become_an_external_link(): void
+    public function test_unreadable_pdf_is_linked_and_later_proofs_still_appear(): void
     {
-        $this->document($this->education, 'broken-proof.pdf', '%PDF-1.4 broken contents', 'candidate');
+        $broken = $this->document($this->education, 'broken-proof.pdf', '%PDF-1.4 broken contents', 'candidate');
+        $this->document($this->education, 'good-proof.pdf', $this->fixturePdf('GOOD-PROOF', 2), 'client');
+        $this->document($this->employment, 'employment-proof.pdf', $this->fixturePdf('EMPLOYMENT'), 'admin');
         $this->mock(ReportDocumentConverter::class, function ($mock) {
             $mock->shouldReceive('normalizePdf')->once()->andThrow(new \RuntimeException('Damaged PDF.'));
         });
-        $this->expectException(ReportDocumentException::class);
-        $this->expectExceptionMessage('No incomplete report was downloaded');
-        app(CaseReportBuilder::class)->build($this->case);
+        $pdf = app(CaseReportBuilder::class)->build($this->case);
+        $pages = implode("\n", $this->pages($pdf));
+        $this->assertStringContainsString('GOOD-PROOF-1', $pages);
+        $this->assertStringContainsString('GOOD-PROOF-2', $pages);
+        $this->assertStringContainsString('EMPLOYMENT-1', $pages);
+        $this->assertContains(route('documents.view', $broken), $this->links($pdf));
+        $this->actingAs($this->case->createdBy)->get(route('documents.view', $broken))
+            ->assertOk()->assertHeader('Content-Type', 'application/octet-stream');
+        $otherOrganization = ClientOrganization::create(['name' => 'Other organization']);
+        $otherUser = User::create([
+            'name' => 'Other client', 'email' => 'other@example.test', 'password' => 'password123',
+            'role' => 'organization', 'is_verified' => true, 'client_organization_id' => $otherOrganization->id,
+        ]);
+        $this->actingAs($otherUser)->get(route('documents.view', $broken))->assertForbidden();
+    }
+
+    public function test_office_conversion_failure_uses_a_clickable_original_link(): void
+    {
+        $office = $this->document($this->employment, 'employment-history.docx', 'office document', 'admin');
+        $this->mock(ReportDocumentConverter::class, function ($mock) {
+            $mock->shouldReceive('convert')->once()->andThrow(new \RuntimeException('Converter not configured.'));
+        });
+        $pdf = app(CaseReportBuilder::class)->build($this->case);
+        $this->assertNotEmpty($this->pages($pdf));
+        $this->assertContains(route('documents.view', $office), $this->links($pdf));
+    }
+
+    public function test_general_case_document_fallback_links_survive_pdf_merging(): void
+    {
+        $file = $this->document(null, 'general-document.doc', 'office document', 'client');
+        $this->mock(ReportDocumentConverter::class, function ($mock) {
+            $mock->shouldReceive('convert')->once()->andThrow(new \RuntimeException('Converter unavailable.'));
+        });
+        $pdf = app(CaseReportBuilder::class)->build($this->case);
+        $this->assertContains(route('documents.view', $file), $this->links($pdf));
     }
 
     public function test_pdf_normalization_preserves_every_page_before_importing(): void
@@ -212,6 +250,19 @@ class CaseReportBuilderTest extends TestCase
         }
 
         return $pages;
+    }
+
+    private function links(string $bytes): array
+    {
+        $reader = new PdfReader(new PdfParser(StreamReader::createByString($bytes)));
+        $links = [];
+        for ($index = 1; $index <= $reader->getPageCount(); $index++) {
+            foreach ($reader->getPage($index)->getExternalLinks() as $link) {
+                $links[] = $link['uri'];
+            }
+        }
+
+        return $links;
     }
 
     private function drawnStreams(string $content, mixed $resources, PdfParser $parser, int $depth = 0): string

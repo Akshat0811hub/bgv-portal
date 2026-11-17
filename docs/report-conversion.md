@@ -48,7 +48,7 @@ For the local Docker example use `REPORT_GOTENBERG_URL=http://127.0.0.1:3000` an
 
 The application sends document bytes only when a trusted converter URL is explicitly configured. Files are sent over multipart POST with a generic filename; personal names are not used as converter filenames. It does not contact a public conversion service automatically. Redirects are disabled so evidence and authentication cannot be forwarded to another host.
 
-Office documents use `/forms/libreoffice/convert` with `pdfa=PDF/A-1b`. PDFs requiring normalization use `/forms/pdfengines/convert` with `pdfa=PDF/A-1b`; an installed qpdf binary takes precedence for PDF normalization. Every response must be a PDF. Password-protected, damaged, unsupported, or unavailable files fail the complete report rather than silently disappearing or becoming external download links.
+Office documents use `/forms/libreoffice/convert` with `pdfa=PDF/A-1b`. PDFs requiring normalization use `/forms/pdfengines/convert` with `pdfa=PDF/A-1b`; an installed qpdf binary takes precedence for PDF normalization. Every converter response must be a PDF. If a file cannot be previewed, report generation continues: its name, uploader and clickable original-file link are shown under its check. Links require portal login and permission for the case. Missing originals are explicitly marked unavailable and must be restored or re-uploaded; they do not block the remaining report. Available previews stay embedded after their corresponding check.
 
 ## Formats and limits
 
