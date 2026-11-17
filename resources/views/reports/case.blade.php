@@ -236,8 +236,10 @@
             @foreach($check->documents as $doc)
             <div class="doc">
                 <a href="{{ route('documents.view', $doc) }}" style="color:#0f2044;font-weight:bold;text-decoration:underline;">{{ $doc->original_name }}</a>
-                @if(isset($appendices[$doc->id]))
-                    <span class="meta2"> - Embedded in Appendix {{ $appendices[$doc->id] }} below</span>
+                @if(in_array($doc->id, $linkOnlyIds ?? [], true))
+                    <span class="meta2"> - <a href="{{ route('documents.view', $doc) }}" style="color:#0d9488;font-weight:bold;text-decoration:underline;">Open Original File &rarr;</a></span>
+                @elseif(in_array($doc->id, $embeddedIds ?? [], true))
+                    <span class="meta2"> - Included below</span>
                 @endif
                 <span class="meta2">
                     &nbsp;· {{ $doc->formatted_size }}{{ $doc->uploaded_by_role === 'admin' ? ' · Agency Verified Proof' : ' · Candidate Submitted' }}
@@ -261,15 +263,31 @@
 </div>
 @endif
 
-@if(isset($documents) && $documents->isNotEmpty())
-<h2>Supporting Document Index</h2>
-<p>All documents below are included after this report, in appendix order.</p>
+@if(isset($linkOnlyDocs) && $linkOnlyDocs->isNotEmpty())
+<h2>External Document Links</h2>
+<p>The following documents could not be embedded directly and can be opened using the secure links below:</p>
 <table class="summary">
-    <thead><tr><th>Appendix</th><th>Document</th><th>Check</th></tr></thead>
+    <thead><tr><th>Document</th><th>Check</th><th>Link</th></tr></thead>
     <tbody>
-    @foreach($documents as $doc)
+    @foreach($linkOnlyDocs as $doc)
         <tr>
-            <td>{{ $appendices[$doc->id] }}</td>
+            <td>{{ $doc->original_name }}</td>
+            <td>{{ $doc->caseCheck ? ucwords(str_replace('_', ' ', $doc->caseCheck->check_type)) : 'General case document' }}</td>
+            <td><a href="{{ route('documents.view', $doc) }}" style="color:#0d9488;font-weight:bold;text-decoration:underline;">Open File &rarr;</a></td>
+        </tr>
+    @endforeach
+    </tbody>
+</table>
+@endif
+
+@if(isset($embeddedDocs) && $embeddedDocs->isNotEmpty())
+<h2>Attached Documents (Included Below)</h2>
+<table class="summary">
+    <thead><tr><th>#</th><th>Document</th><th>Check</th></tr></thead>
+    <tbody>
+    @foreach($embeddedDocs as $idx => $doc)
+        <tr>
+            <td>{{ $idx + 1 }}</td>
             <td>{{ $doc->original_name }}</td>
             <td>{{ $doc->caseCheck ? ucwords(str_replace('_', ' ', $doc->caseCheck->check_type)) : 'General case document' }}</td>
         </tr>

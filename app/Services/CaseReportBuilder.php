@@ -22,10 +22,68 @@ class CaseReportBuilder
 
         // Include every document belonging to this case, once, in a stable order.
         $documents = $case->documents()->with('caseCheck')->orderBy('case_check_id')->orderBy('id')->get();
-        $appendices = $documents->values()->mapWithKeys(fn ($doc, $index) => [$doc->id => $index + 1]);
-        $report = $this->renderPdf('reports.case', compact('case', 'schemas', 'documents', 'appendices'));
 
-        if ($documents->isEmpty()) {
+        $embeddedDocs = collect();
+        $linkOnlyDocs = collect();
+        $preparedPieces = [];
+        $isVercel = (bool) (getenv('VERCEL') || getenv('VERCEL_ENV'));
+        $runningBytes = 100_000; // reserve ~100KB for main summary report
+
+        foreach ($documents as $document) {
+            $checkName = $document->caseCheck
+                ? ucwords(str_replace('_', ' ', $document->caseCheck->check_type))
+                : 'General Case Document';
+
+            try {
+                $bytes = $this->readDocument($document);
+                $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
+                $ext = strtolower(pathinfo($document->original_name ?? '', PATHINFO_EXTENSION));
+
+                if ($mime === 'application/pdf' || $ext === 'pdf') {
+                    // Verify FPDI can parse this PDF cleanly before committing it as embedded.
+                    $probe = new Fpdi();
+                    $pageCount = $probe->setSourceFile(StreamReader::createByString($bytes));
+                    if ($pageCount < 1) {
+                        throw new \RuntimeException('Empty PDF.');
+                    }
+                    $piece = $bytes;
+                } elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
+                    $piece = $this->imagePdf($bytes, $mime, $document->original_name, $checkName);
+                } elseif ($ext === 'docx' || $mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+                    $piece = $this->docxPdf($bytes, $document->original_name);
+                } elseif (str_starts_with((string) $mime, 'text/') || in_array($ext, ['txt', 'csv', 'log'], true)) {
+                    $piece = $this->textPdf($bytes, $document->original_name);
+                } else {
+                    throw new \RuntimeException('Unsupported format for inline embedding.');
+                }
+
+                if ($isVercel && ($runningBytes + strlen($piece)) > self::VERCEL_MAX_PAYLOAD_BYTES) {
+                    $linkOnlyDocs->push($document);
+                    continue;
+                }
+
+                $embeddedDocs->push($document);
+                $preparedPieces[$document->id] = $piece;
+                $runningBytes += strlen($piece);
+            } catch (\Throwable $exception) {
+                $linkOnlyDocs->push($document);
+            }
+        }
+
+        $embeddedIds = $embeddedDocs->pluck('id')->all();
+        $linkOnlyIds = $linkOnlyDocs->pluck('id')->all();
+
+        $report = $this->renderPdf('reports.case', compact(
+            'case',
+            'schemas',
+            'documents',
+            'embeddedDocs',
+            'linkOnlyDocs',
+            'embeddedIds',
+            'linkOnlyIds'
+        ));
+
+        if ($embeddedDocs->isEmpty()) {
             return $report;
         }
 
@@ -35,50 +93,14 @@ class CaseReportBuilder
         $merged->SetAuthor('Orbit Verify');
         $this->appendPdf($merged, $report);
 
-        $runningBytes = strlen($report);
-
-        foreach ($documents as $document) {
-            $divider = $this->renderPdf('reports.appendix', [
-                'case' => $case,
-                'document' => $document,
-                'number' => $appendices[$document->id],
-            ]);
-            $this->appendPdf($merged, $divider);
-            $runningBytes += strlen($divider);
-
-            try {
-                $bytes = $this->readDocument($document);
-                $mime = (new \finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
-                $ext = strtolower(pathinfo($document->original_name ?? '', PATHINFO_EXTENSION));
-
-                if ($mime === 'application/pdf' || $ext === 'pdf') {
-                    $piece = $bytes;
-                } elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
-                    $piece = $this->imagePdf($bytes, $mime);
-                } elseif ($ext === 'docx' || $mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                    $piece = $this->docxPdf($bytes, $document->original_name);
-                } elseif (str_starts_with((string) $mime, 'text/') || in_array($ext, ['txt', 'csv', 'log'], true)) {
-                    $piece = $this->textPdf($bytes, $document->original_name);
-                } else {
-                    $piece = $this->fallbackPdf($document);
-                }
-
-                // Stay safely below Vercel's 4.5 MB serverless response payload ceiling.
-                if (($runningBytes + strlen($piece)) > self::VERCEL_MAX_PAYLOAD_BYTES && (getenv('VERCEL') || getenv('VERCEL_ENV'))) {
-                    $piece = $this->fallbackPdf($document);
-                }
-
-                $this->appendPdf($merged, $piece);
-                $runningBytes += strlen($piece);
-            } catch (\Throwable $exception) {
-                $fallback = $this->fallbackPdf($document);
-                $this->appendPdf($merged, $fallback);
-                $runningBytes += strlen($fallback);
+        foreach ($embeddedDocs as $document) {
+            if (isset($preparedPieces[$document->id])) {
+                $this->appendPdf($merged, $preparedPieces[$document->id]);
             }
         }
 
         $output = $merged->Output('S');
-        if (strlen($output) > self::VERCEL_MAX_PAYLOAD_BYTES && (getenv('VERCEL') || getenv('VERCEL_ENV'))) {
+        if ($isVercel && strlen($output) > self::VERCEL_MAX_PAYLOAD_BYTES) {
             return $report;
         }
 
@@ -128,7 +150,7 @@ class CaseReportBuilder
         }
     }
 
-    private function imagePdf(string $bytes, string $mime): string
+    private function imagePdf(string $bytes, string $mime, string $documentName, string $checkName): string
     {
         if (! in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
             throw new \RuntimeException('Unsupported document format.');
@@ -142,7 +164,6 @@ class CaseReportBuilder
             }
             try {
                 $width = imagesx($image);
-                $height = imagesy($image);
                 if ($width > 1400) {
                     $scaled = imagescale($image, 1400);
                     if ($scaled !== false) {
@@ -169,7 +190,7 @@ class CaseReportBuilder
         }
         $imageUri = 'data:'.$mime.';base64,'.base64_encode($bytes);
 
-        return $this->renderPdf('reports.evidence-image', compact('imageUri'));
+        return $this->renderPdf('reports.evidence-image', compact('imageUri', 'documentName', 'checkName'));
     }
 
     private function docxPdf(string $bytes, string $title): string
@@ -256,12 +277,5 @@ class CaseReportBuilder
         }
 
         return $this->renderPdf('reports.evidence-text', compact('title', 'blocks'));
-    }
-
-    private function fallbackPdf(Document $document): string
-    {
-        $viewUrl = route('documents.view', $document);
-
-        return $this->renderPdf('reports.evidence-fallback', compact('document', 'viewUrl'));
     }
 }
