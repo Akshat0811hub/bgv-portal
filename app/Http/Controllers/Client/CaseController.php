@@ -105,14 +105,27 @@ class CaseController extends Controller
         }
 
         // send_link: email the candidate.
+        $smtpActive = \App\Models\Setting::applyMailConfig();
+        $mailError = null;
         try {
             Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token));
         } catch (\Throwable $e) {
-            Log::warning('Failed to send candidate invite email: '.$e->getMessage());
+            $mailError = $e->getMessage();
+            Log::warning('Failed to send candidate invite email: '.$mailError);
+        }
+
+        if ($mailError) {
+            return redirect()->route('client.cases.show', $case)
+                ->with('warning', "Case created! Link is ready below, but email failed ({$mailError}).");
+        }
+
+        if (! $smtpActive) {
+            return redirect()->route('client.cases.show', $case)
+                ->with('warning', "Case created & upload link ready! (Email not sent to Gmail because SMTP is not configured in Admin → Email Settings yet.)");
         }
 
         return redirect()->route('client.cases.show', $case)
-            ->with('success', "Case created and upload link sent to {$case->candidate_email}.");
+            ->with('success', "Case created and upload link emailed to {$case->candidate_email}.");
     }
 
     public function show(Cases $case)
@@ -174,10 +187,21 @@ class CaseController extends Controller
             $case->load('uploadToken');
         }
 
+        $smtpActive = \App\Models\Setting::applyMailConfig();
+        $mailError = null;
         try {
             Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token, reminder: true));
         } catch (\Throwable $e) {
-            Log::warning('Failed to send candidate invite email: ' . $e->getMessage());
+            $mailError = $e->getMessage();
+            Log::warning('Failed to send candidate invite email: ' . $mailError);
+        }
+
+        if ($mailError) {
+            return back()->with('warning', "Upload link ready, but email failed ({$mailError}).");
+        }
+
+        if (! $smtpActive) {
+            return back()->with('warning', "Upload link ready, but SMTP is not configured in Admin → Email Settings yet.");
         }
 
         return back()->with('success', "Upload link re-sent to {$case->candidate_email}.");
