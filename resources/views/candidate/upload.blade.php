@@ -132,9 +132,7 @@
             $checkName = ucwords(str_replace('_', ' ', $check->check_type));
             $schema    = $schemas[$check->check_type] ?? [];
             $isInsuff  = ($check->status === 'Insufficiency');
-            $requiresFile = $isInsuff || collect($schema)->flatten(1)->contains(
-                fn ($f) => ($f['type'] ?? '') === 'file' || str_starts_with($f['name'] ?? '', '_file')
-            );
+            $requiresFile = $isInsuff;
         @endphp
 
         <div class="card {{ $isInsuff ? 'ring-2 ring-amber-400 border-amber-300' : '' }}" x-data="{ open: true }" data-check-card="{{ $checkName }}" data-requires-file="{{ $requiresFile ? '1' : '0' }}">

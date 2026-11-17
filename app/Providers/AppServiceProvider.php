@@ -17,8 +17,8 @@ class AppServiceProvider extends ServiceProvider
         // In production or when accessed via HTTPS tunnel/proxy, generate https links/assets.
         if (
             $this->app->environment('production') ||
-            request()->header('X-Forwarded-Proto') === 'https' ||
-            str_starts_with((string) config('app.url'), 'https://')
+            str_starts_with((string) config('app.url'), 'https://') ||
+            ($this->app->bound('request') && $this->app->make('request')->header('X-Forwarded-Proto') === 'https')
         ) {
             URL::forceScheme('https');
         }

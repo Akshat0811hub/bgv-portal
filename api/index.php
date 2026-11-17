@@ -13,6 +13,7 @@ if (!is_dir($storagePath)) {
     @mkdir($storagePath . '/framework/sessions', 0755, true);
     @mkdir($storagePath . '/logs', 0755, true);
     @mkdir($storagePath . '/app/public', 0755, true);
+    @mkdir($storagePath . '/app/private', 0755, true);
 }
 
 // Copy pre-seeded initial SQLite database if external DB is not set
@@ -30,6 +31,8 @@ if (empty(getenv('DB_HOST')) && (!file_exists('/tmp/database.sqlite') || filesiz
 }
 
 // Set environment variables for serverless execution
+putenv('STORAGE_DIR=' . $storagePath . '/app/private');
+putenv('PUBLIC_STORAGE_DIR=' . $storagePath . '/app/public');
 putenv('VIEW_COMPILED_PATH=/tmp/views');
 putenv('APP_SERVICES_CACHE=' . $storagePath . '/services.php');
 putenv('APP_PACKAGES_CACHE=' . $storagePath . '/packages.php');

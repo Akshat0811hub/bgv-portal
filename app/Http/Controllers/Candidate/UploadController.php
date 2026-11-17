@@ -36,9 +36,9 @@ class UploadController extends Controller
         $request->validate([
             'check_data' => 'nullable|array',
             'check_files' => 'nullable|array',
-            'check_files.*' => 'array',
-            'check_files.*.*' => 'array|max:5',
-            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
+            'check_files.*' => 'nullable|array',
+            'check_files.*.*' => 'nullable',
+            'check_files.*.*.*' => 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
         ]);
 
         $case = $uploadToken->case;
@@ -49,22 +49,19 @@ class UploadController extends Controller
         $uploadedFilesByCheck = (array) ($request->allFiles()['check_files'] ?? []);
         $hasNewFiles = ! empty($uploadedFilesByCheck);
 
-        // Enforce that any check which requires file upload has at least one document attached (either previously or in this submission)
+        // Enforce that checks flagged for Insufficiency have their supporting documents attached
         foreach ($case->checks as $chk) {
             $slug = $chk->check_type;
-            $checkSchema = $schemas[$slug] ?? [];
-            $checkHasFileField = collect($checkSchema)->flatten(1)->contains(
-                fn ($f) => ($f['type'] ?? '') === 'file' || str_starts_with($f['name'] ?? '', '_file')
-            );
+            if ($chk->status === 'Insufficiency') {
+                $alreadyHasDocs = $chk->documents()->count() > 0;
+                $uploadedForThisCheck = ! empty($uploadedFilesByCheck[$slug] ?? []);
 
-            $alreadyHasDocs = $chk->documents()->count() > 0;
-            $uploadedForThisCheck = ! empty($uploadedFilesByCheck[$slug] ?? []);
-
-            if (($checkHasFileField || $chk->status === 'Insufficiency') && ! $alreadyHasDocs && ! $uploadedForThisCheck) {
-                $checkLabel = ucwords(str_replace('_', ' ', $slug));
-                return back()
-                    ->withErrors(['upload' => "Please upload the required supporting document(s) for {$checkLabel} before submitting."])
-                    ->withInput();
+                if (! $alreadyHasDocs && ! $uploadedForThisCheck) {
+                    $checkLabel = ucwords(str_replace('_', ' ', $slug));
+                    return back()
+                        ->withErrors(['upload' => "Please upload the required supporting document(s) for {$checkLabel} before submitting."])
+                        ->withInput();
+                }
             }
         }
 

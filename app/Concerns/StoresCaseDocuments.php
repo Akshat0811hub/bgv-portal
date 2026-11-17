@@ -10,7 +10,6 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
-
 trait StoresCaseDocuments
 {
     /**
@@ -39,9 +38,11 @@ trait StoresCaseDocuments
 
             foreach ((array) $request->file("check_files.$slug", []) as $fieldKey => $files) {
                 foreach ((array) $files as $file) {
-                    $this->storeDocument($file, $case, $check, $fieldKey, $role);
-                    $uploadedFiles++;
-                    $touched = true;
+                    if ($file instanceof UploadedFile && $file->isValid()) {
+                        $this->storeDocument($file, $case, $check, (string) $fieldKey, $role);
+                        $uploadedFiles++;
+                        $touched = true;
+                    }
                 }
             }
 
