@@ -4,6 +4,9 @@
 // Setup writable storage directory in /tmp for serverless runtime (AWS Lambda / Vercel)
 $storagePath = '/tmp/storage';
 
+if (!is_dir('/tmp/views')) {
+    @mkdir('/tmp/views', 0755, true);
+}
 if (!is_dir($storagePath)) {
     @mkdir($storagePath . '/framework/views', 0755, true);
     @mkdir($storagePath . '/framework/cache/data', 0755, true);
@@ -27,7 +30,7 @@ if (empty(getenv('DB_HOST')) && (!file_exists('/tmp/database.sqlite') || filesiz
 }
 
 // Set environment variables for serverless execution
-putenv('VIEW_COMPILED_PATH=' . $storagePath . '/framework/views');
+putenv('VIEW_COMPILED_PATH=/tmp/views');
 putenv('APP_SERVICES_CACHE=' . $storagePath . '/services.php');
 putenv('APP_PACKAGES_CACHE=' . $storagePath . '/packages.php');
 putenv('APP_CONFIG_CACHE=' . $storagePath . '/config.php');
