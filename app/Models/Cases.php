@@ -108,8 +108,9 @@ class Cases extends Model
         return DB::transaction(function () {
             $prefix = 'OV-' . date('Y') . '-';
             $last = self::where('case_number', 'like', $prefix . '%')
+                ->orderByDesc('case_number')
                 ->lockForUpdate()
-                ->max('case_number');
+                ->value('case_number');
             $next = $last ? ((int) substr($last, strlen($prefix))) + 1 : 1;
             return $prefix . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
         });
