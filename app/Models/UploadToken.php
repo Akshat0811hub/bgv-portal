@@ -27,6 +27,13 @@ class UploadToken extends Model
     public static function encodeSnapshot(Cases $case): string
     {
         $case->loadMissing('checks', 'clientOrganization');
+        $customSchemas = [];
+        foreach ($case->checks as $chk) {
+            if (is_array($chk->custom_schema)) {
+                $customSchemas[$chk->check_type] = $chk->custom_schema;
+            }
+        }
+
         $data = [
             'cn' => $case->case_number,
             'na' => $case->candidate_name,
@@ -36,6 +43,7 @@ class UploadToken extends Model
             'de' => $case->candidate_designation,
             'or' => $case->clientOrganization?->name ?? 'Orbit Verify Client',
             'ch' => $case->checks->pluck('check_type')->values()->all(),
+            'cs' => $customSchemas,
         ];
 
         return rtrim(strtr(base64_encode((string) json_encode($data, JSON_UNESCAPED_UNICODE)), '+/', '-_'), '=');
@@ -91,10 +99,14 @@ class UploadToken extends Model
             ]
         );
 
+        $customSchemas = (array) ($snap['cs'] ?? []);
         foreach ($submittedCheckSlugs as $slug) {
             $case->checks()->firstOrCreate(
                 ['check_type' => $slug],
-                ['status' => 'Pending']
+                [
+                    'status'        => 'Pending',
+                    'custom_schema' => isset($customSchemas[$slug]) && is_array($customSchemas[$slug]) ? $customSchemas[$slug] : null,
+                ]
             );
         }
 

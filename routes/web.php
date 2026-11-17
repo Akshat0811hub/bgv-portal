@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\Admin\CaseController as AdminCase;
+use App\Http\Controllers\Admin\CheckController as AdminCheck;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboard;
 use App\Http\Controllers\Admin\ReportController as AdminReport;
+use App\Http\Controllers\Admin\SettingController as AdminSetting;
 use App\Http\Controllers\Admin\UserController as AdminUser;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PasswordController;
@@ -55,9 +57,20 @@ Route::middleware(['auth', AdminMiddleware::class])->prefix('admin')->name('admi
     Route::post('/cases/{case}/checks', [AdminCase::class, 'addCheck'])->name('cases.checks.store');
     Route::delete('/cases/{case}/checks/{check}', [AdminCase::class, 'destroyCheck'])->name('cases.checks.destroy');
     Route::patch('/cases/{case}/checks/{check}', [AdminCase::class, 'updateCheck'])->name('cases.checks.update');
+    Route::patch('/cases/{case}/checks/{check}/quick-status', [AdminCase::class, 'quickStatus'])->name('cases.checks.quick-status');
+    Route::put('/cases/{case}/checks/{check}/schema', [AdminCase::class, 'updateCheckSchema'])->name('cases.checks.schema');
     Route::patch('/cases/{case}/status', [AdminCase::class, 'updateStatus'])->name('cases.status');
     Route::post('/cases/{case}/resend-link', [AdminCase::class, 'resendLink'])->name('cases.resend-link');
     Route::post('/cases/{case}/checks/{check}/insufficiency', [AdminCase::class, 'triggerInsufficiency'])->name('cases.checks.insufficiency');
+
+    // Global Check Fields Customization
+    Route::get('/checks', [AdminCheck::class, 'index'])->name('checks.index');
+    Route::put('/checks/{check}', [AdminCheck::class, 'update'])->name('checks.update');
+
+    // Email / SMTP Settings
+    Route::get('/settings/email', [AdminSetting::class, 'email'])->name('settings.email');
+    Route::post('/settings/email', [AdminSetting::class, 'updateEmail'])->name('settings.email.update');
+    Route::post('/settings/email/test', [AdminSetting::class, 'testEmail'])->name('settings.email.test');
 
     // User management
     Route::get('/users', [AdminUser::class, 'index'])->name('users.index');

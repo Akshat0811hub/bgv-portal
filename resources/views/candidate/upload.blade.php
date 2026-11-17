@@ -131,7 +131,7 @@
         @foreach($uploadToken->case->checks as $check)
         @php
             $checkName = ucwords(str_replace('_', ' ', $check->check_type));
-            $schema    = $schemas[$check->check_type] ?? [];
+            $schema    = $check->effectiveSchema($schemas[$check->check_type] ?? []);
             $isInsuff  = ($check->status === 'Insufficiency');
             $requiresFile = $isInsuff;
         @endphp

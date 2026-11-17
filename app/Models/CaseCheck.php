@@ -7,14 +7,28 @@ use Illuminate\Database\Eloquent\Model;
 class CaseCheck extends Model
 {
     protected $fillable = [
-        'case_id', 'check_type', 'status', 'form_data', 'verified_data', 'comments', 'completed_at',
+        'case_id', 'check_type', 'status', 'form_data', 'verified_data', 'comments', 'custom_schema', 'completed_at',
     ];
 
     protected $casts = [
         'form_data'     => 'array',
         'verified_data' => 'array',
+        'custom_schema' => 'array',
         'completed_at'  => 'datetime',
     ];
+
+    public function effectiveSchema(?array $globalSchema = null): array
+    {
+        if (is_array($this->custom_schema)) {
+            return $this->custom_schema;
+        }
+
+        if ($globalSchema !== null) {
+            return $globalSchema;
+        }
+
+        return Check::where('slug', $this->check_type)->value('schema') ?? [];
+    }
 
     public function case()
     {

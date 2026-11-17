@@ -111,10 +111,20 @@ class CaseController extends Controller
         }
 
         // send_link: email the candidate.
-        $this->sendInvite($case, $token);
+        $mailResult = $this->sendInvite($case, $token);
+
+        if ($mailResult['error']) {
+            return redirect()->route('admin.cases.show', $case)
+                ->with('warning', "Case created! Link is ready below, but email delivery failed ({$mailResult['error']}). Check Admin → Email Settings.");
+        }
+
+        if (! $mailResult['smtp']) {
+            return redirect()->route('admin.cases.show', $case)
+                ->with('success', "Case created & upload link ready for {$case->candidate_email}. (Tip: Configure SMTP in Admin → Email Settings to deliver directly to Gmail.)");
+        }
 
         return redirect()->route('admin.cases.show', $case)
-            ->with('success', "Case created and verification link sent to {$case->candidate_email}.");
+            ->with('success', "Case created and verification link emailed to {$case->candidate_email}.");
     }
 
     public function resendLink(Cases $case)
@@ -132,7 +142,15 @@ class CaseController extends Controller
             $case->load('uploadToken');
         }
 
-        $this->sendInvite($case, $token, reminder: true);
+        $mailResult = $this->sendInvite($case, $token, reminder: true);
+
+        if ($mailResult['error']) {
+            return back()->with('warning', "Upload link refreshed, but email failed ({$mailResult['error']}). Check Admin → Email Settings.");
+        }
+
+        if (! $mailResult['smtp']) {
+            return back()->with('success', "Upload link ready for {$case->candidate_email}. (Configure SMTP in Admin → Email Settings to send real emails.)");
+        }
 
         return back()->with('success', "Upload link re-sent to {$case->candidate_email}.");
     }
@@ -173,12 +191,18 @@ class CaseController extends Controller
         return back()->with('success', 'Insufficiency raised and the candidate has been notified.');
     }
 
-    private function sendInvite(Cases $case, string $token, bool $reminder = false): void
+    private function sendInvite(Cases $case, string $token, bool $reminder = false): array
     {
+        $smtpConfigured = \App\Models\Setting::applyMailConfig();
+
         try {
             Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token, $reminder));
+
+            return ['sent' => true, 'smtp' => $smtpConfigured, 'error' => null];
         } catch (\Throwable $e) {
             Log::warning('Failed to send candidate invite email: '.$e->getMessage());
+
+            return ['sent' => false, 'smtp' => $smtpConfigured, 'error' => $e->getMessage()];
         }
     }
 
@@ -283,6 +307,112 @@ class CaseController extends Controller
         $case->syncStatusAndCloseDate();
 
         return back()->with('success', 'Check updated successfully.');
+    }
+
+    public function quickStatus(Request $request, Cases $case, CaseCheck $check)
+    {
+        abort_if($check->case_id !== $case->id, 404);
+
+        $data = $request->validate([
+            'status' => 'required|in:Pending,In Progress,Insufficiency,Amber,Discrepancy Found,Clear,Failed,Completed',
+        ]);
+
+        $update = ['status' => $data['status']];
+        if (in_array($data['status'], ['Clear', 'Completed', 'Discrepancy Found', 'Failed', 'Amber'])) {
+            $update['completed_at'] = $check->completed_at ?? now();
+        } else {
+            $update['completed_at'] = null;
+        }
+
+        $check->update($update);
+        $case->syncStatusAndCloseDate();
+        $case->refresh()->load('checks');
+
+        if ($request->expectsJson()) {
+            $total = $case->checks->count();
+            $done  = $case->checks->whereIn('status', ['Clear', 'Completed', 'Failed', 'Discrepancy Found', 'Amber'])->count();
+
+            return response()->json([
+                'ok'           => true,
+                'check_status' => $check->status,
+                'case_status'  => $case->status,
+                'done_checks'  => $done,
+                'total_checks' => $total,
+                'pct_done'     => $total > 0 ? (int) round($done / $total * 100) : 0,
+            ]);
+        }
+
+        return back()->with('success', ucwords(str_replace('_', ' ', $check->check_type)) . " status updated to {$data['status']}.");
+    }
+
+    public function updateCheckSchema(Request $request, Cases $case, CaseCheck $check)
+    {
+        abort_if($check->case_id !== $case->id, 404);
+
+        if ($request->boolean('reset_default')) {
+            $check->update(['custom_schema' => null]);
+
+            return back()->with('success', 'Check fields reset to default template.');
+        }
+
+        $schema = [];
+
+        foreach ((array) $request->input('existing_fields', []) as $row) {
+            if (empty($row['enabled'])) {
+                continue;
+            }
+            $section = trim((string) ($row['section'] ?? '_self')) ?: '_self';
+            $name    = trim((string) ($row['name'] ?? ''));
+            $label   = trim((string) ($row['label'] ?? ''));
+            $type    = in_array($row['type'] ?? 'text', ['text', 'date', 'file', 'radio']) ? $row['type'] : 'text';
+
+            if ($name === '' || $label === '') {
+                continue;
+            }
+
+            $field = ['name' => $name, 'label' => $label];
+            if ($type !== 'text') {
+                $field['type'] = $type;
+            }
+            if ($type === 'radio' && ! empty($row['options'])) {
+                $opts = array_values(array_filter(array_map('trim', explode(',', (string) $row['options']))));
+                if (! empty($opts)) {
+                    $field['options'] = $opts;
+                }
+            }
+
+            $schema[$section][] = $field;
+        }
+
+        foreach ((array) $request->input('new_fields', []) as $row) {
+            $label   = trim((string) ($row['label'] ?? ''));
+            if ($label === '') {
+                continue;
+            }
+            $section = trim((string) ($row['section'] ?? '_self')) ?: '_self';
+            $type    = in_array($row['type'] ?? 'text', ['text', 'date', 'file', 'radio']) ? $row['type'] : 'text';
+            $slugName = Str::camel(Str::slug($label, '_')) ?: ('field_' . Str::random(5));
+            if ($type === 'file' && ! str_starts_with($slugName, '_file')) {
+                $slugName = '_file_' . ltrim($slugName, '_');
+            }
+
+            $field = ['name' => $slugName, 'label' => $label];
+            if ($type !== 'text') {
+                $field['type'] = $type;
+            }
+            if ($type === 'radio' && ! empty($row['options'])) {
+                $opts = array_values(array_filter(array_map('trim', explode(',', (string) $row['options']))));
+                if (! empty($opts)) {
+                    $field['options'] = $opts;
+                }
+            }
+
+            $schema[$section][] = $field;
+        }
+
+        $check->update(['custom_schema' => $schema]);
+
+        return back()->with('success', 'Custom fields saved for ' . ucwords(str_replace('_', ' ', $check->check_type)) . '.');
     }
 
     public function report(Cases $case)

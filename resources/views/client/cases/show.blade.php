@@ -71,7 +71,7 @@
 
             <div class="p-6 space-y-5">
                 @php
-                    $schema = $schemas[$check->check_type] ?? [];
+                    $schema = $check->effectiveSchema($schemas[$check->check_type] ?? []);
                     $hasVerified = !empty($check->verified_data);
                 @endphp
 

@@ -24,19 +24,26 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Auto-initialize schema & default users on fresh cloud databases (e.g. Hostinger MySQL / Neon / TiDB)
-        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready')) {
+        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready_v2')) {
             try {
                 if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                     \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
-                } elseif (! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content')) {
+                } elseif (
+                    ! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content') ||
+                    ! \Illuminate\Support\Facades\Schema::hasColumn('case_checks', 'custom_schema') ||
+                    ! \Illuminate\Support\Facades\Schema::hasTable('settings')
+                ) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 }
-                @touch(sys_get_temp_dir() . '/.orbit_db_ready');
+                @touch(sys_get_temp_dir() . '/.orbit_db_ready_v2');
             } catch (\Throwable $e) {
                 // Database connection not ready yet
             }
         }
+
+        // Apply database-stored SMTP settings if configured
+        \App\Models\Setting::applyMailConfig();
 
         // Login: 5 attempts per minute keyed by email + IP
         RateLimiter::for('login', function (Request $request) {

@@ -156,7 +156,7 @@
 <h2>Detailed Verification Findings</h2>
 @foreach($case->checks as $check)
 @php
-    $schema = $schemas[$check->check_type] ?? [];
+    $schema = $check->effectiveSchema($schemas[$check->check_type] ?? []);
     [$t, $b] = $badge($check->status);
 @endphp
 <div class="check">
