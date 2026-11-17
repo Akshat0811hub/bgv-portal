@@ -84,23 +84,45 @@ trait StoresCaseDocuments
         string $fieldKey,
         string $role,
     ): Document {
+        $rawContent = null;
+        try {
+            if ($file->getRealPath() && is_readable($file->getRealPath())) {
+                $rawContent = base64_encode((string) file_get_contents($file->getRealPath()));
+            }
+        } catch (\Throwable $e) {
+            $rawContent = null;
+        }
+
+        $mimeType = $file->getMimeType() ?: ($file->getClientMimeType() ?: 'application/octet-stream');
+        $fileSize = $file->getSize() ?: 0;
+
         $path = $file->store("cases/{$case->id}/{$fieldKey}", 'local');
+        if (! $path) {
+            $ext = $file->getClientOriginalExtension() ?: 'bin';
+            $path = "cases/{$case->id}/{$fieldKey}/" . Str::random(40) . '.' . $ext;
+        }
 
         $rawName = $file->getClientOriginalName();
         $safeName = preg_replace('/[\x00-\x1F\x7F\/\\\\<>:"\'|?*]/', '_', basename($rawName));
         $safeName = mb_substr($safeName, 0, 200) ?: 'document';
 
-        return Document::create([
+        $payload = [
             'case_id' => $case->id,
             'case_check_id' => $check?->id,
             'uploaded_by' => $role === 'candidate' ? null : auth()->id(),
             'original_name' => $safeName,
             'stored_path' => $path,
-            'mime_type' => $file->getMimeType(),
-            'file_size' => $file->getSize(),
+            'mime_type' => $mimeType,
+            'file_size' => $fileSize,
             'field_key' => $fieldKey,
             'uploaded_by_role' => $role,
-        ]);
+        ];
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content')) {
+            $payload['file_content'] = $rawContent;
+        }
+
+        return Document::create($payload);
     }
 
     /**

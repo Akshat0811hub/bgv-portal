@@ -40,11 +40,16 @@ putenv('APP_CONFIG_CACHE=' . $storagePath . '/config.php');
 putenv('APP_ROUTES_CACHE=' . $storagePath . '/routes.php');
 putenv('APP_EVENTS_CACHE=' . $storagePath . '/events.php');
 
-if (empty(getenv('DB_HOST'))) {
+$hasExternalDb = !empty(getenv('DB_HOST')) || !empty(getenv('DB_URL')) || !empty($_ENV['DB_HOST']) || !empty($_ENV['DB_URL']);
+
+if (!$hasExternalDb) {
     putenv('DB_CONNECTION=sqlite');
     putenv('DB_DATABASE=/tmp/database.sqlite');
     $_ENV['DB_CONNECTION'] = 'sqlite';
     $_ENV['DB_DATABASE'] = '/tmp/database.sqlite';
+} elseif (empty(getenv('DB_CONNECTION')) && empty($_ENV['DB_CONNECTION'])) {
+    putenv('DB_CONNECTION=mysql');
+    $_ENV['DB_CONNECTION'] = 'mysql';
 }
 
 require __DIR__ . '/../public/index.php';

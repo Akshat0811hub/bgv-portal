@@ -23,6 +23,21 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
+        // Auto-initialize schema & default users on fresh cloud databases (e.g. Hostinger MySQL / Neon / TiDB)
+        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready')) {
+            try {
+                if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
+                    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+                    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
+                } elseif (! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content')) {
+                    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+                }
+                @touch(sys_get_temp_dir() . '/.orbit_db_ready');
+            } catch (\Throwable $e) {
+                // Database connection not ready yet
+            }
+        }
+
         // Login: 5 attempts per minute keyed by email + IP
         RateLimiter::for('login', function (Request $request) {
             return Limit::perMinute(5)

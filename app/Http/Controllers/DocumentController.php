@@ -15,23 +15,34 @@ class DocumentController extends Controller
             abort(403);
         }
 
-        $disk = Storage::disk('local');
-        if (! $disk->exists($document->stored_path)) {
-            abort(404);
-        }
-
-        $path = $disk->path($document->stored_path);
-
         // Strip any characters that could break the Content-Disposition header
         $safeName = preg_replace('/[\x00-\x1F\x7F"\\\\]/', '_', $document->original_name);
         $safeMime = in_array($document->mime_type, ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'])
             ? $document->mime_type
             : 'application/octet-stream';
 
-        return response()->file($path, [
-            'Content-Type'        => $safeMime,
-            'Content-Disposition' => 'inline; filename="' . $safeName . '"',
-        ]);
+        $disk = Storage::disk('local');
+        if ($disk->exists($document->stored_path)) {
+            $path = $disk->path($document->stored_path);
+
+            return response()->file($path, [
+                'Content-Type'        => $safeMime,
+                'Content-Disposition' => 'inline; filename="' . $safeName . '"',
+            ]);
+        }
+
+        if (! empty($document->file_content)) {
+            $binary = base64_decode($document->file_content, true);
+            if ($binary !== false) {
+                return response($binary, 200, [
+                    'Content-Type'        => $safeMime,
+                    'Content-Length'      => strlen($binary),
+                    'Content-Disposition' => 'inline; filename="' . $safeName . '"',
+                ]);
+            }
+        }
+
+        abort(404);
     }
 
     public function destroy(Document $document)

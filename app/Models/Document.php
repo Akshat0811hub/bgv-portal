@@ -9,7 +9,10 @@ class Document extends Model
     protected $fillable = [
         'case_id', 'case_check_id', 'uploaded_by', 'original_name',
         'stored_path', 'mime_type', 'file_size', 'field_key', 'uploaded_by_role',
+        'file_content',
     ];
+
+    protected $hidden = ['file_content'];
 
     public function case()
     {
