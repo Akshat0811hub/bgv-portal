@@ -2,6 +2,7 @@
     'slug',          // check slug — namespaces the field names
     'schema' => [],  // schema array: [ section => [ {name,label,type,options,placeholder}, ... ] ]
     'data' => [],    // existing form_data for prefill, nested: [ section => [ field => value ] ]
+    'enforceRequired' => false,
 ])
 
 {{--
@@ -12,28 +13,33 @@
 @php
     // Every check needs an evidence uploader, including text-only custom templates.
     $hasFileField = collect($schema)->flatMap(fn ($fields) => $fields)
-        ->contains(fn ($field) => ($field['type'] ?? '') === 'file' || str_starts_with($field['name'] ?? '', '_file'));
+        ->contains(fn ($field) => ($field['type'] ?? (str_starts_with($field['name'] ?? '', '_file') ? 'file' : 'text')) === 'file');
     if (!$hasFileField) {
         $schema['_self'][] = ['name' => '_file', 'label' => 'Upload Supporting Documents', 'type' => 'file'];
     }
 @endphp
 <div class="space-y-5">
     @foreach($schema as $section => $fields)
-        @php $isSelf = ($section === '_self'); @endphp
+        @php
+            $isSelf = ($section === '_self');
+            $sectionLabel = $fields[0]['section_label'] ?? $section;
+        @endphp
 
         <div @class(['rounded-lg border border-[#e2e8f0] p-4' => !$isSelf])>
-            @unless($isSelf)
-                <h4 class="text-sm font-semibold text-[#0f2044] mb-3">{{ $section }}</h4>
-            @endunless
+            @if(!$isSelf || $sectionLabel !== '_self')
+                <h4 class="text-sm font-semibold text-[#0f2044] mb-3">{{ $sectionLabel }}</h4>
+            @endif
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 @foreach($fields as $field)
                     @php
                         $name    = $field['name'];
                         $label   = $field['label'] ?? \Illuminate\Support\Str::headline($name);
-                        $type    = $field['type'] ?? 'text';
-                        $isFile  = $type === 'file' || str_starts_with($name, '_file');
-                        $value   = data_get($data, "$section.$name", '');
+                        $type    = $field['type'] ?? (str_starts_with($name, '_file') ? 'file' : 'text');
+                        $isFile  = $type === 'file';
+                        $value   = old("check_data.$slug.$section.$name", data_get($data, "$section.$name", ''));
+                        $required = $enforceRequired && ($field['required'] ?? false);
+                        $inputName = "check_data[$slug][$section][$name]";
                         $inputId = \Illuminate\Support\Str::slug("$slug-$section-$name");
                     @endphp
 
@@ -64,7 +70,7 @@
                                 }
                             }
                         }">
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
                             <div class="border-2 border-dashed rounded-xl p-5 text-center transition-colors cursor-pointer"
                                  :class="dragging ? 'border-[#0d9488] bg-teal-50/50' : (files.length ? 'border-emerald-400 bg-emerald-50/20' : 'border-[#cbd5e1] hover:border-[#0d9488] bg-[#f8fafc]/50')"
                                  @click="$refs.fileInput.click()"
@@ -104,7 +110,7 @@
                     @elseif($type === 'radio')
                         {{-- Radio group --}}
                         <div class="sm:col-span-2">
-                            <span class="form-label">{{ $label }}</span>
+                            <span class="form-label">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</span>
                             <div class="flex flex-wrap gap-x-5 gap-y-2 mt-1">
                                 @foreach(($field['options'] ?? []) as $opt)
                                 <label class="inline-flex items-center gap-2 text-sm text-[#374151] cursor-pointer">
@@ -112,6 +118,7 @@
                                            name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
                                            value="{{ $opt }}"
                                            class="text-[#0d9488] border-[#d1d5db] focus:ring-[#0d9488]"
+                                           @required($required)
                                            @checked((string) $value === (string) $opt)>
                                     {{ $opt }}
                                 </label>
@@ -119,7 +126,31 @@
                             </div>
                         </div>
 
-                    @elseif($name === 'aadhaar')
+                    @elseif($type === 'textarea')
+                        <div class="sm:col-span-2">
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
+                            <textarea id="{{ $inputId }}" name="{{ $inputName }}" rows="4" placeholder="{{ $field['placeholder'] ?? '' }}" class="form-input" @required($required)>{{ $value }}</textarea>
+                        </div>
+
+                    @elseif($type === 'select')
+                        <div>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
+                            <select id="{{ $inputId }}" name="{{ $inputName }}" class="form-select" @required($required)>
+                                <option value="">{{ $field['placeholder'] ?? 'Choose an option' }}</option>
+                                @foreach(($field['options'] ?? []) as $option)
+                                    <option value="{{ $option }}" @selected((string) $value === (string) $option)>{{ $option }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                    @elseif($type === 'checkbox')
+                        <div class="flex items-center gap-3 py-3">
+                            <input type="hidden" name="{{ $inputName }}" value="0">
+                            <input type="checkbox" id="{{ $inputId }}" name="{{ $inputName }}" value="1" @checked(in_array($value, [true, 1, '1', 'yes', 'on'], true)) @required($required) class="rounded text-[#0d9488] focus:ring-[#0d9488]">
+                            <label class="form-label !mb-0" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
+                        </div>
+
+                    @elseif($name === 'aadhaar' && $type === 'text')
                         {{-- Aadhaar: Only digits, formatted as XXXX-XXXX-XXXX (12 digits) --}}
                         <div class="sm:col-span-1" x-data="{
                             val: '{{ $value }}',
@@ -133,7 +164,7 @@
                                 e.target.value = this.val;
                             }
                         }">
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
                             <input type="text"
                                    id="{{ $inputId }}"
                                    name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
@@ -141,7 +172,7 @@
                                    @input="format($event)"
                                    maxlength="14"
                                    inputmode="numeric"
-                                   placeholder="1234-5678-9012"
+                                   placeholder="{{ $field['placeholder'] ?? '1234-5678-9012' }}" @required($required)
                                    class="form-input font-mono tracking-wider">
                             <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -149,7 +180,7 @@
                             </p>
                         </div>
 
-                    @elseif($name === 'pan')
+                    @elseif($name === 'pan' && $type === 'text')
                         {{-- PAN: Uppercase only, 5 letters + 4 digits + 1 letter (ABCDE1234F) --}}
                         <div class="sm:col-span-1" x-data="{
                             val: '{{ strtoupper($value) }}',
@@ -171,14 +202,14 @@
                                 e.target.value = clean;
                             }
                         }">
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
                             <input type="text"
                                    id="{{ $inputId }}"
                                    name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
                                    :value="val"
                                    @input="format($event)"
                                    maxlength="10"
-                                   placeholder="ABCDE1234F"
+                                   placeholder="{{ $field['placeholder'] ?? 'ABCDE1234F' }}" @required($required)
                                    class="form-input font-mono tracking-wider uppercase">
                             <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -186,7 +217,7 @@
                             </p>
                         </div>
 
-                    @elseif(in_array($name, ['drivingLicence', 'driving_licence', 'dl']))
+                    @elseif(in_array($name, ['drivingLicence', 'driving_licence', 'dl']) && $type === 'text')
                         {{-- Driving License: Uppercase, 2 letters state code + digits (DL-0420110012345) --}}
                         <div class="sm:col-span-1" x-data="{
                             val: '{{ strtoupper($value) }}',
@@ -210,14 +241,14 @@
                                 e.target.value = formatted;
                             }
                         }">
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
                             <input type="text"
                                    id="{{ $inputId }}"
                                    name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
                                    :value="val"
                                    @input="format($event)"
                                    maxlength="16"
-                                   placeholder="DL-0420150012345"
+                                   placeholder="{{ $field['placeholder'] ?? 'DL-0420150012345' }}" @required($required)
                                    class="form-input font-mono tracking-wider uppercase">
                             <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
                                 <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -225,7 +256,7 @@
                             </p>
                         </div>
 
-                    @elseif($name === 'pincode')
+                    @elseif($name === 'pincode' && $type === 'text')
                         {{-- Pincode: 6 digits only --}}
                         <div class="sm:col-span-1" x-data="{
                             val: '{{ $value }}',
@@ -234,7 +265,7 @@
                                 e.target.value = this.val;
                             }
                         }">
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
                             <input type="text"
                                    id="{{ $inputId }}"
                                    name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
@@ -242,21 +273,26 @@
                                    @input="format($event)"
                                    maxlength="6"
                                    inputmode="numeric"
-                                   placeholder="110001"
+                                   placeholder="{{ $field['placeholder'] ?? '110001' }}" @required($required)
                                    class="form-input font-mono">
                         </div>
 
                     @else
                         {{-- Text / date --}}
                         <div @class(['sm:col-span-2' => in_array($name, ['address', 'reason', 'handles'])])>
-                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
-                            <input type="{{ $type === 'date' ? 'date' : 'text' }}"
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }} @if($field['required'] ?? false)<span class="text-rose-600" aria-label="required">*</span>@endif</label>
+                            <input type="{{ in_array($type, ['date', 'number', 'email', 'tel']) ? $type : 'text' }}"
                                    id="{{ $inputId }}"
                                    name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
                                    value="{{ $value }}"
                                    placeholder="{{ $field['placeholder'] ?? '' }}"
+                                   @if($type === 'number') step="any" @endif
+                                   @required($required)
                                    class="form-input">
                         </div>
+                    @endif
+                    @if(!empty($field['help']))
+                        <p class="text-xs text-slate-500 sm:col-span-2 -mt-2">{{ $field['help'] }}</p>
                     @endif
                 @endforeach
             </div>

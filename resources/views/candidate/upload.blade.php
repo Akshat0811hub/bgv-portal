@@ -130,7 +130,7 @@
 
         @foreach($uploadToken->case->checks as $check)
         @php
-            $checkName = ucwords(str_replace('_', ' ', $check->check_type));
+            $checkName = $check->display_name;
             $schema    = $check->effectiveSchema($schemas[$check->check_type] ?? []);
             $isInsuff  = ($check->status === 'Insufficiency');
             $requiresFile = $isInsuff;
@@ -165,7 +165,7 @@
                     @endif
 
                     @if(!empty($schema))
-                        <x-check-fields :slug="$check->check_type" :schema="$schema" :data="$check->form_data ?? []" />
+                        <x-check-fields :slug="$check->check_type" :schema="$schema" :data="$check->form_data ?? []" :enforce-required="true" />
                     @else
                         {{-- Fallback: schema unknown, allow generic file upload --}}
                         <label class="form-label">Upload Supporting Documents</label>

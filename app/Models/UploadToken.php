@@ -10,7 +10,7 @@ class UploadToken extends Model
     protected $fillable = ['case_id', 'token', 'used', 'expires_at'];
 
     protected $casts = [
-        'used'       => 'boolean',
+        'used' => 'boolean',
         'expires_at' => 'datetime',
     ];
 
@@ -21,16 +21,20 @@ class UploadToken extends Model
 
     public function isValid(): bool
     {
-        return !$this->used && ($this->expires_at === null || $this->expires_at->isFuture());
+        return ! $this->used && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 
     public static function encodeSnapshot(Cases $case): string
     {
         $case->loadMissing('checks', 'clientOrganization');
         $customSchemas = [];
+        $customNames = [];
         foreach ($case->checks as $chk) {
             if (is_array($chk->custom_schema)) {
                 $customSchemas[$chk->check_type] = $chk->custom_schema;
+            }
+            if ($chk->custom_name) {
+                $customNames[$chk->check_type] = $chk->custom_name;
             }
         }
 
@@ -44,6 +48,7 @@ class UploadToken extends Model
             'or' => $case->clientOrganization?->name ?? 'Orbit Verify Client',
             'ch' => $case->checks->pluck('check_type')->values()->all(),
             'cs' => $customSchemas,
+            'cm' => $customNames,
         ];
 
         return rtrim(strtr(base64_encode((string) json_encode($data, JSON_UNESCAPED_UNICODE)), '+/', '-_'), '=');
@@ -83,19 +88,19 @@ class UploadToken extends Model
         $org = ClientOrganization::firstOrCreate(['name' => $orgName]);
         $creator = User::first();
 
-        $caseNumber = $snap['cn'] ?? ('OV-' . date('Y') . '-' . strtoupper(substr(md5($token), 0, 5)));
+        $caseNumber = $snap['cn'] ?? ('OV-'.date('Y').'-'.strtoupper(substr(md5($token), 0, 5)));
         $case = Cases::firstOrCreate(
             ['case_number' => $caseNumber],
             [
                 'client_organization_id' => $org->id,
-                'created_by'             => $creator?->id,
-                'status'                 => 'Pending',
-                'candidate_name'         => $snap['na'] ?? 'Candidate',
-                'candidate_email'        => $snap['em'] ?? 'candidate@orbitverify.com',
-                'candidate_phone'        => $snap['ph'] ?? null,
-                'candidate_father_name'  => $snap['fn'] ?? null,
-                'candidate_designation'  => $snap['de'] ?? null,
-                'case_start_date'        => now()->toDateString(),
+                'created_by' => $creator?->id,
+                'status' => 'Pending',
+                'candidate_name' => $snap['na'] ?? 'Candidate',
+                'candidate_email' => $snap['em'] ?? 'candidate@orbitverify.com',
+                'candidate_phone' => $snap['ph'] ?? null,
+                'candidate_father_name' => $snap['fn'] ?? null,
+                'candidate_designation' => $snap['de'] ?? null,
+                'case_start_date' => now()->toDateString(),
             ]
         );
 
@@ -104,8 +109,9 @@ class UploadToken extends Model
             $case->checks()->firstOrCreate(
                 ['check_type' => $slug],
                 [
-                    'status'        => 'Pending',
+                    'status' => 'Pending',
                     'custom_schema' => isset($customSchemas[$slug]) && is_array($customSchemas[$slug]) ? $customSchemas[$slug] : null,
+                    'custom_name' => isset($snap['cm'][$slug]) && is_string($snap['cm'][$slug]) ? mb_substr($snap['cm'][$slug], 0, 150) : null,
                 ]
             );
         }
@@ -113,8 +119,8 @@ class UploadToken extends Model
         $uploadToken = self::updateOrCreate(
             ['case_id' => $case->id],
             [
-                'token'      => substr($token, 0, 64),
-                'used'       => false,
+                'token' => substr($token, 0, 64),
+                'used' => false,
                 'expires_at' => now()->addDays(7),
             ]
         );

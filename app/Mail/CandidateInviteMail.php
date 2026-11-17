@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\Cases;
+use App\Models\UploadToken;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -39,12 +40,12 @@ class CandidateInviteMail extends Mailable
     public function content(): Content
     {
         $checkNames = collect($this->case->checks)
-            ->map(fn ($c) => ucwords(str_replace('_', ' ', $c->check_type)))
+            ->map(fn ($c) => $c->display_name)
             ->values();
 
         // Honor Laravel's forced HTTPS scheme when running behind a proxy.
         $baseUrl = route('candidate.upload.show', $this->token);
-        $uploadUrl = $baseUrl . '?ctx=' . \App\Models\UploadToken::encodeSnapshot($this->case);
+        $uploadUrl = $baseUrl.'?ctx='.UploadToken::encodeSnapshot($this->case);
 
         return new Content(
             view: 'emails.candidate-invite',

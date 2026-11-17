@@ -97,6 +97,8 @@ Route::middleware(['auth', ClientMiddleware::class])->prefix('client')->name('cl
     Route::patch('/cases/{case}/candidate', [ClientCase::class, 'updateCandidate'])->name('cases.candidate.update');
     Route::post('/cases/{case}/resend-link', [ClientCase::class, 'resendLink'])->name('cases.resend-link');
     Route::post('/cases/{case}/checks/{check}/documents', [ClientCase::class, 'uploadCheckDocuments'])->name('cases.checks.documents');
+    Route::put('/cases/{case}/checks/{check}/schema', [ClientCase::class, 'updateCheckSchema'])->name('cases.checks.schema');
+    Route::patch('/cases/{case}/checks/{check}/details', [ClientCase::class, 'updateCheckDetails'])->name('cases.checks.details');
 
     // Company profile
     Route::get('/profile', [ClientProfile::class, 'edit'])->name('profile.edit');

@@ -43,6 +43,7 @@ class UploadController extends Controller
 
         $case = $uploadToken->case;
         $schemas = $this->schemasFor($case->checks->pluck('check_type'));
+        app(\App\Services\CandidateFieldValidator::class)->validate($request, $case, $schemas);
 
         // Check whether the candidate actually entered any new data or uploaded any files
         $rawCheckData = $this->pruneEmpty((array) $request->input('check_data', []));
@@ -57,7 +58,7 @@ class UploadController extends Controller
                 $uploadedForThisCheck = ! empty($uploadedFilesByCheck[$slug] ?? []);
 
                 if (! $alreadyHasDocs && ! $uploadedForThisCheck) {
-                    $checkLabel = ucwords(str_replace('_', ' ', $slug));
+                    $checkLabel = $chk->display_name;
                     return back()
                         ->withErrors(['upload' => "Please upload the required supporting document(s) for {$checkLabel} before submitting."])
                         ->withInput();

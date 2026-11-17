@@ -175,7 +175,7 @@ class CaseController extends Controller
             Mail::to($case->candidate_email)->send(new InsufficiencyMail(
                 case: $case,
                 token: $token,
-                checkName: ucwords(str_replace('_', ' ', $check->check_type)),
+                checkName: $check->display_name,
                 reason: $data['reason'] ?? null,
                 expiresAt: $case->uploadToken->expires_at,
             ));
@@ -343,73 +343,12 @@ class CaseController extends Controller
     public function updateCheckSchema(Request $request, Cases $case, CaseCheck $check)
     {
         abort_if($check->case_id !== $case->id, 404);
+        app(\App\Services\CheckSchemaEditor::class)->update($check, $request);
 
-        if ($request->boolean('reset_default')) {
-            $check->update(['custom_schema' => null]);
-
-            return back()->with('success', 'Check fields reset to default template.');
-        }
-
-        $schema = [];
-
-        foreach ((array) $request->input('existing_fields', []) as $row) {
-            if (empty($row['enabled'])) {
-                continue;
-            }
-            $section = trim((string) ($row['section'] ?? '_self')) ?: '_self';
-            $name    = trim((string) ($row['name'] ?? ''));
-            $label   = trim((string) ($row['label'] ?? ''));
-            $type    = in_array($row['type'] ?? 'text', ['text', 'date', 'file', 'radio']) ? $row['type'] : 'text';
-
-            if ($name === '' || $label === '') {
-                continue;
-            }
-
-            $field = ['name' => $name, 'label' => $label];
-            if ($type !== 'text') {
-                $field['type'] = $type;
-            }
-            if ($type === 'radio' && ! empty($row['options'])) {
-                $opts = array_values(array_filter(array_map('trim', explode(',', (string) $row['options']))));
-                if (! empty($opts)) {
-                    $field['options'] = $opts;
-                }
-            }
-
-            $schema[$section][] = $field;
-        }
-
-        foreach ((array) $request->input('new_fields', []) as $row) {
-            $label   = trim((string) ($row['label'] ?? ''));
-            if ($label === '') {
-                continue;
-            }
-            $section = trim((string) ($row['section'] ?? '_self')) ?: '_self';
-            $type    = in_array($row['type'] ?? 'text', ['text', 'date', 'file', 'radio']) ? $row['type'] : 'text';
-            $slugName = Str::camel(Str::slug($label, '_')) ?: ('field_' . Str::random(5));
-            if ($type === 'file' && ! str_starts_with($slugName, '_file')) {
-                $slugName = '_file_' . ltrim($slugName, '_');
-            }
-
-            $field = ['name' => $slugName, 'label' => $label];
-            if ($type !== 'text') {
-                $field['type'] = $type;
-            }
-            if ($type === 'radio' && ! empty($row['options'])) {
-                $opts = array_values(array_filter(array_map('trim', explode(',', (string) $row['options']))));
-                if (! empty($opts)) {
-                    $field['options'] = $opts;
-                }
-            }
-
-            $schema[$section][] = $field;
-        }
-
-        $check->update(['custom_schema' => $schema]);
-
-        return back()->with('success', 'Custom fields saved for ' . ucwords(str_replace('_', ' ', $check->check_type)) . '.');
+        return back()->with('success', $request->boolean('reset_default')
+            ? 'Check fields reset to the default template. Saved values and documents were retained.'
+            : 'Check layout saved. Labels, sections and fields are ready for this case.');
     }
-
     public function report(Cases $case)
     {
         return $this->caseReportPdf($case);

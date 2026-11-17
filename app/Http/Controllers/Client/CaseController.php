@@ -145,6 +145,41 @@ class CaseController extends Controller
         return $this->caseReportPdf($case);
     }
 
+    public function updateCheckSchema(Request $request, Cases $case, \App\Models\CaseCheck $check)
+    {
+        abort_unless($case->client_organization_id === auth()->user()->client_organization_id, 403);
+        abort_if($check->case_id !== $case->id, 404);
+        app(\App\Services\CheckSchemaEditor::class)->update($check, $request);
+
+        return back()->with('success', $request->boolean('reset_default')
+            ? 'Check fields reset to the default template. Saved values and documents were retained.'
+            : 'Check layout saved for this case. Your candidate form and report use these fields.');
+    }
+
+    public function updateCheckDetails(Request $request, Cases $case, \App\Models\CaseCheck $check)
+    {
+        abort_unless($case->client_organization_id === auth()->user()->client_organization_id, 403);
+        abort_if($check->case_id !== $case->id, 404);
+        abort_if($case->isCompletedStatus(), 403, 'Stated details cannot be changed after the report is finalized.');
+        $request->validate([
+            'check_data' => 'nullable|array|max:20',
+            'check_data.*' => 'array|max:20',
+            'check_data.*.*' => 'array|max:100',
+            'check_files' => 'nullable|array|max:20',
+            'check_files.*' => 'array|max:100',
+            'check_files.*.*' => 'array|max:20',
+            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
+        ]);
+
+        // Only the selected check may receive data from this form. Agency findings remain untouched.
+        $case->setRelation('checks', collect([$check]));
+        $this->captureCheckSubmission($request, $case, 'client');
+        $case->unsetRelation('checks');
+        $case->syncStatusAndCloseDate();
+
+        return back()->with('success', 'Stated details and supporting documents saved for this check.');
+    }
+
     public function updateCandidate(Request $request, Cases $case)
     {
         if ($case->client_organization_id !== auth()->user()->client_organization_id) {

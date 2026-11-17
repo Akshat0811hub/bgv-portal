@@ -40,7 +40,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <div>
-                        <span class="font-semibold text-[#0f2044]">{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</span>
+                        <span class="font-semibold text-[#0f2044]">{{ $check->display_name }}</span>
                         @if($check->completed_at)
                             <div class="text-xs text-[#64748b]">Verified on {{ $check->completed_at->format('d M Y') }}</div>
                         @endif
@@ -54,7 +54,22 @@
                     $schema = $check->effectiveSchema($schemas[$check->check_type] ?? []);
                 @endphp
 
-                <x-check-comparison :schema="$schema" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
+                <x-check-field-editor :check="$check" :case="$case" :schema="$schema" :action="route('client.cases.checks.schema', [$case, $check])" />
+
+                @if(!$case->isCompletedStatus())
+                <div x-data="{ editingDetails: false }" class="rounded-xl border border-slate-200 p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div><h3 class="text-sm font-semibold text-[#0f2044]">Submitted details</h3><p class="text-xs text-slate-500 mt-1">Enter or update the information for this check.</p></div>
+                        <button type="button" @click="editingDetails = !editingDetails" class="btn-outline btn-sm" :aria-expanded="editingDetails"><span x-text="editingDetails ? 'Close details' : 'Edit details'"></span></button>
+                    </div>
+                    <form x-show="editingDetails" x-collapse style="display:none" method="POST" action="{{ route('client.cases.checks.details', [$case, $check]) }}" enctype="multipart/form-data" class="mt-4 space-y-4">
+                        @csrf @method('PATCH')
+                        <x-check-fields :slug="$check->check_type" :schema="$schema" :data="$check->form_data ?? []" />
+                        <button type="submit" class="btn-teal btn-sm">Save submitted details</button>
+                    </form>
+                </div>
+                @endif
+                <x-check-comparison :schema="$schema" :include-unmapped="!is_array($check->custom_schema)" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
 
                 @if($check->comments)
                 <div>

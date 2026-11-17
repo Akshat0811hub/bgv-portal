@@ -42,7 +42,7 @@
                 default => 'bg-amber-50 text-amber-700 border-amber-300 focus:ring-amber-400',
             };
         @endphp
-        <div class="card overflow-hidden" x-data="{ open: {{ $idx === 0 || in_array($check->status, ['In Progress', 'Pending', 'Insufficiency']) ? 'true' : 'false' }}, customizeOpen: false, newFields: [] }">
+        <div class="card overflow-hidden" x-data="{ open: {{ $idx === 0 || in_array($check->status, ['In Progress', 'Pending', 'Insufficiency']) ? 'true' : 'false' }} }">
             <div class="w-full card-header hover:bg-[#f8fafc]/80 transition-colors flex flex-wrap items-center justify-between gap-3 cursor-pointer" @click="open = !open">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="w-9 h-9 rounded-xl
@@ -56,7 +56,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
                     </div>
                     <div class="min-w-0">
-                        <div class="font-semibold text-[#0f2044] truncate">{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</div>
+                        <div class="font-semibold text-[#0f2044] truncate">{{ $check->display_name }}</div>
                         <div class="text-xs text-[#64748b] flex items-center gap-2 mt-0.5">
                             @if($check->completed_at)
                                 <span>Verified {{ $check->completed_at->format('d M Y, h:i A') }}</span>
@@ -98,101 +98,8 @@
             <div x-show="open">
                 <div class="p-4 sm:p-6 space-y-6 bg-white">
 
-                    {{-- Customize Check Fields Toolbar & Inline Editor --}}
-                    <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#f1f5f9]">
-                        <p class="section-label !mb-0">Check Configuration</p>
-                        <button type="button" @click="customizeOpen = !customizeOpen"
-                                class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
-                                :class="customizeOpen ? 'bg-[#0f2044] text-white border-[#0f2044]' : 'bg-white text-[#0f2044] border-[#cbd5e1] hover:border-[#0d9488] hover:text-[#0d9488]'">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
-                            <span x-text="customizeOpen ? 'Close Field Editor' : 'Customize Fields (Add / Remove)'"></span>
-                        </button>
-                    </div>
-
-                    <div x-show="customizeOpen" style="display:none" class="rounded-xl border border-teal-200 bg-teal-50/40 p-4 space-y-4">
-                        <div class="flex items-center justify-between gap-2">
-                            <div>
-                                <h4 class="text-sm font-bold text-[#0f2044]">Customize Fields for {{ ucwords(str_replace('_', ' ', $check->check_type)) }}</h4>
-                                <p class="text-xs text-[#64748b]">Uncheck any field (like Aadhaar/Passport) to remove it for this case, or add your own custom fields below.</p>
-                            </div>
-                            @if(is_array($check->custom_schema))
-                            <form method="POST" action="{{ route('admin.cases.checks.schema', [$case, $check]) }}">
-                                @csrf @method('PUT')
-                                <input type="hidden" name="reset_default" value="1">
-                                <button type="submit" class="text-xs font-medium text-rose-600 hover:underline">Reset to Default</button>
-                            </form>
-                            @endif
-                        </div>
-
-                        <form method="POST" action="{{ route('admin.cases.checks.schema', [$case, $check]) }}" class="space-y-3">
-                            @csrf @method('PUT')
-                            @php $fieldIdx = 0; @endphp
-                            <div class="space-y-2">
-                                @foreach($schema as $secName => $secFields)
-                                    @foreach($secFields as $fld)
-                                        @php
-                                            $fType = $fld['type'] ?? (str_starts_with($fld['name'] ?? '', '_file') ? 'file' : 'text');
-                                            $fOpts = isset($fld['options']) && is_array($fld['options']) ? implode(', ', $fld['options']) : '';
-                                        @endphp
-                                        <div class="flex flex-wrap items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">
-                                            <input type="checkbox" name="existing_fields[{{ $fieldIdx }}][enabled]" value="1" checked
-                                                   class="rounded text-[#0d9488] focus:ring-[#0d9488]">
-                                            <input type="hidden" name="existing_fields[{{ $fieldIdx }}][section]" value="{{ $secName }}">
-                                            <input type="hidden" name="existing_fields[{{ $fieldIdx }}][name]" value="{{ $fld['name'] }}">
-                                            <input type="hidden" name="existing_fields[{{ $fieldIdx }}][type]" value="{{ $fType }}">
-                                            <input type="hidden" name="existing_fields[{{ $fieldIdx }}][options]" value="{{ $fOpts }}">
-                                            <input type="text" name="existing_fields[{{ $fieldIdx }}][label]" value="{{ $fld['label'] ?? $fld['name'] }}"
-                                                   class="form-input !py-1 !text-xs flex-1 min-w-[160px]" required>
-                                            <span class="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{{ $fType }}</span>
-                                            @if($secName !== '_self')
-                                                <span class="text-[10px] px-2 py-0.5 rounded bg-blue-50 text-blue-700">{{ $secName }}</span>
-                                            @endif
-                                        </div>
-                                        @php $fieldIdx++; @endphp
-                                    @endforeach
-                                @endforeach
-                            </div>
-
-                            {{-- New Custom Fields --}}
-                            <template x-for="(nf, nIdx) in newFields" :key="nIdx">
-                                <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 bg-white border border-teal-300 rounded-lg p-2.5 items-center">
-                                    <div class="sm:col-span-4">
-                                        <input type="text" :name="'new_fields[' + nIdx + '][label]'" x-model="nf.label" placeholder="Custom field label (e.g. UAN Number)"
-                                               class="form-input !py-1.5 !text-xs w-full" required>
-                                    </div>
-                                    <div class="sm:col-span-3">
-                                        <select :name="'new_fields[' + nIdx + '][type]'" x-model="nf.type" class="form-select !py-1.5 !text-xs w-full">
-                                            <option value="text">Text Input</option>
-                                            <option value="date">Date Picker</option>
-                                            <option value="file">File Upload</option>
-                                            <option value="radio">Radio Options</option>
-                                        </select>
-                                    </div>
-                                    <div class="sm:col-span-4">
-                                        <input type="text" :name="'new_fields[' + nIdx + '][section]'" x-model="nf.section" placeholder="Section (_self or name)"
-                                               class="form-input !py-1.5 !text-xs w-full" x-show="nf.type !== 'radio'">
-                                        <input type="text" :name="'new_fields[' + nIdx + '][options]'" x-model="nf.options" placeholder="Options (comma separated: Yes, No)"
-                                               class="form-input !py-1.5 !text-xs w-full" x-show="nf.type === 'radio'">
-                                    </div>
-                                    <div class="sm:col-span-1 text-right">
-                                        <button type="button" @click="newFields.splice(nIdx, 1)" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-2 py-1">✕</button>
-                                    </div>
-                                </div>
-                            </template>
-
-                            <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
-                                <button type="button" @click="newFields.push({ label: '', type: 'text', section: '_self', options: '' })"
-                                        class="btn-outline btn-sm !text-xs">
-                                    + Add Custom Field
-                                </button>
-                                <button type="submit" class="btn-teal btn-sm !text-xs">
-                                    Save Custom Fields
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-
-                    <x-check-comparison :schema="$schema" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
+                    <x-check-field-editor :check="$check" :case="$case" :schema="$schema" :action="route('admin.cases.checks.schema', [$case, $check])" />
+                    <x-check-comparison :schema="$schema" :include-unmapped="!is_array($check->custom_schema)" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
 
                     <x-check-documents :check="$check" :case="$case" :schema="$schema" />
 
@@ -203,7 +110,9 @@
                             if (!form) return;
                             form.querySelectorAll('[data-stated-val]').forEach(input => {
                                 const stated = input.getAttribute('data-stated-val');
-                                if (stated && !input.value) {
+                                if (input.type === 'checkbox') {
+                                    input.checked = ['1', 'true', 'yes'].includes(stated);
+                                } else if (stated && !input.value) {
                                     input.value = stated;
                                 }
                             });
@@ -223,44 +132,7 @@
                         <form method="POST" action="{{ route('admin.cases.checks.update', [$case, $check]) }}" enctype="multipart/form-data">
                             @csrf @method('PATCH')
 
-                            {{-- Verified values mirroring the schema (admin's confirmed findings) --}}
-                            @if(!empty($schema))
-                            <div class="space-y-4 mb-4">
-                                @foreach($schema as $section => $fields)
-                                    @php $isSelf = ($section === '_self'); @endphp
-                                    <div @class(['rounded-xl border border-[#e2e8f0] bg-[#f8fafc]/40 p-4' => !$isSelf])>
-                                        @unless($isSelf)
-                                            <h4 class="text-xs font-bold uppercase tracking-wider text-[#0f2044] mb-3">{{ $section }}</h4>
-                                        @endunless
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            @foreach($fields as $field)
-                                                @php
-                                                    $isFile = ($field['type'] ?? '') === 'file' || str_starts_with($field['name'], '_file');
-                                                    $statedVal = data_get($check->form_data, "$section.{$field['name']}", '');
-                                                    $verifiedVal = data_get($check->verified_data, "$section.{$field['name']}", '');
-                                                @endphp
-                                                @continue($isFile)
-                                                <div>
-                                                    <label class="form-label flex items-center justify-between">
-                                                        <span>{{ $field['label'] ?? $field['name'] }}</span>
-                                                        @if($statedVal !== '' && $statedVal !== null)
-                                                            <span class="text-[11px] font-normal text-[#64748b] truncate max-w-[160px]" title="Stated: {{ $statedVal }}">Stated: {{ $statedVal }}</span>
-                                                        @endif
-                                                    </label>
-                                                    <input type="text"
-                                                           name="verified_data[{{ $section }}][{{ $field['name'] }}]"
-                                                           value="{{ $verifiedVal }}"
-                                                           data-stated-val="{{ $statedVal }}"
-                                                           placeholder="{{ $statedVal !== '' ? 'Confirm: ' . $statedVal : 'Enter verified finding…' }}"
-                                                           class="form-input">
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                            @endif
-
+                            <x-verified-fields :check="$check" :schema="$schema" />
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label class="form-label">Check Verification Status</label>

@@ -34,7 +34,7 @@ class CaseReportBuilder
             $documentResults = $check->documents->mapWithKeys(fn ($document) => [$document->id => $this->prepareDocument($document)]);
             $this->appendPdf($merged, $this->renderPdf('reports.check', compact('case', 'check', 'schema', 'number', 'documentResults')));
             foreach ($check->documents as $document) {
-                $this->appendDocument($merged, $document, $documentResults[$document->id], ucwords(str_replace('_', ' ', $check->check_type)));
+                $this->appendDocument($merged, $document, $documentResults[$document->id], $check->display_name);
             }
         }
         $checkIds = $case->checks->pluck('id')->all();

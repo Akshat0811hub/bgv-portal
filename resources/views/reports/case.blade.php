@@ -15,7 +15,7 @@
 <table class="comparison">
 <thead><tr><th style="width:6%">#</th><th>Verification check</th><th style="width:23%">Status</th><th style="width:20%">Completed</th><th style="width:10%">Files</th></tr></thead>
 <tbody>@foreach($case->checks as $index => $check)
-<tr><td>{{ $index + 1 }}</td><td><strong>{{ ucwords(str_replace('_', ' ', $check->check_type)) }}</strong></td><td>{{ $check->status }}</td><td>{{ optional($check->completed_at)->format('d M Y') ?: 'Pending' }}</td><td>{{ $check->documents->count() }}</td></tr>
+<tr><td>{{ $index + 1 }}</td><td><strong>{{ $check->display_name }}</strong></td><td>{{ $check->status }}</td><td>{{ optional($check->completed_at)->format('d M Y') ?: 'Pending' }}</td><td>{{ $check->documents->count() }}</td></tr>
 @endforeach</tbody></table>
 @if($case->admin_notes)<h2>Overall remarks</h2><div class="remarks">{{ $case->admin_notes }}</div>@endif
 <div class="note"><strong>Evidence and original-file links</strong><br>This report lists {{ $case->checks->count() }} verification checks and {{ $documents->count() }} uploaded files. Each check is followed by its available document previews. Files that cannot be previewed have an original-file link; missing files are marked unavailable. General case documents appear at the end.</div>
