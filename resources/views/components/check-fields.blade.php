@@ -50,7 +50,7 @@
                                  @dragover.prevent="dragging = true"
                                  @dragleave.prevent="dragging = false"
                                  @drop.prevent="handleDrop($event)">
-                                <input type="file" x-ref="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp"
+                                <input type="file" x-ref="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.txt"
                                        id="{{ $inputId }}"
                                        name="check_files[{{ $slug }}][{{ $name }}][]"
                                        class="hidden"
@@ -59,7 +59,7 @@
                                 <div class="pointer-events-none">
                                     <svg class="w-8 h-8 mx-auto mb-2 text-[#0d9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                                     <span class="text-sm font-semibold text-[#0f2044]">Click to choose files or drag &amp; drop here</span>
-                                    <span class="block text-xs text-[#64748b] mt-1">Supported: PDF, JPG, PNG, WebP (Max 10MB per file)</span>
+                                    <span class="block text-xs text-[#64748b] mt-1">Supported: PDF, Word (.docx), JPG, PNG, WebP, TXT (Max 10MB per file)</span>
                                 </div>
                                 <div class="mt-3 space-y-1.5" x-show="files.length > 0" style="display:none">
                                     <template x-for="(f, i) in files" :key="i">

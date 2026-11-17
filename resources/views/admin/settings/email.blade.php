@@ -3,7 +3,7 @@
 <div class="page-header">
     <div>
         <h1 class="page-title">Email / SMTP Settings</h1>
-        <p class="page-subtitle">Configure Gmail or Hostinger SMTP so background verification invites are delivered directly to candidate Gmail inboxes.</p>
+        <p class="page-subtitle">Configure email delivery for client credentials and candidate case notifications.</p>
     </div>
 </div>
 
@@ -70,11 +70,21 @@
                 <form method="POST" action="{{ route('admin.settings.email.test') }}" class="space-y-3">
                     @csrf
                     <div>
-                        <label class="form-label">Recipient Gmail Address</label>
+                        <label class="form-label">Recipient Email Address</label>
                         <input type="email" name="test_email" required placeholder="candidate@gmail.com" class="form-input">
                     </div>
                     <button type="submit" class="btn-primary w-full justify-center">Send Test Email Now</button>
                 </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header"><h3 class="font-semibold text-[#0f2044]">Inbox Delivery</h3></div>
+            <div class="card-body text-xs text-[#64748b] space-y-2.5 leading-relaxed">
+                <p>Use a From address authorized by your email provider. For Gmail SMTP, use your authenticated mailbox or a verified sending alias.</p>
+                <p>For a custom domain, publish your provider's SPF and DKIM records, then configure DMARC. The From domain must align with SPF or DKIM. Do not add a second SPF record.</p>
+                <p>Use your production HTTPS portal URL. Send a test to Gmail and inspect Show original: SPF, DKIM and DMARC should pass. SMTP acceptance does not guarantee inbox or Primary-tab placement.</p>
+                <a href="https://support.google.com/mail/answer/81126" target="_blank" rel="noopener noreferrer" class="underline">Google email sender guidelines</a>
             </div>
         </div>
 

@@ -59,6 +59,10 @@ class UserController extends Controller
         // undo a successful account creation.
         $emailed = true;
         try {
+            \App\Models\Setting::applyMailConfig();
+            if (in_array(config('mail.default'), ['log', 'array'])) {
+                throw new \RuntimeException('Live email delivery is not configured.');
+            }
             Mail::to($user->email)->send(new UserCredentialsMail($user, $data['password']));
         } catch (\Throwable $e) {
             $emailed = false;

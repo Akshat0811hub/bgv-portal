@@ -62,7 +62,7 @@ class CaseController extends Controller
             'checks' => 'required|array|min:1|max:20',
             'checks.*' => ['required', 'string', 'in:'.implode(',', $validCheckSlugs)],
             'check_files' => 'nullable|array',
-            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
+            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,docx,txt',
         ]);
 
         $user = auth()->user();
@@ -99,16 +99,11 @@ class CaseController extends Controller
         $case->uploadToken()->create(['token' => $token, 'expires_at' => now()->addDays(7)]);
         $case->load('uploadToken');
 
-        if (in_array($data['mode'], ['admin_upload', 'self_upload'])) {
-            return redirect()->route('client.cases.show', $case)
-                ->with('success', 'Case created with the details you entered.');
-        }
-
-        // send_link: email the candidate.
+        // Notify every candidate; request documents only in send-link mode.
         $smtpActive = \App\Models\Setting::applyMailConfig();
         $mailError = null;
         try {
-            Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token));
+            Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token, requestDocuments: $data['mode'] === 'send_link'));
         } catch (\Throwable $e) {
             $mailError = $e->getMessage();
             Log::warning('Failed to send candidate invite email: '.$mailError);
@@ -125,7 +120,7 @@ class CaseController extends Controller
         }
 
         return redirect()->route('client.cases.show', $case)
-            ->with('success', "Case created and upload link emailed to {$case->candidate_email}.");
+            ->with('success', "Case created and notification emailed to {$case->candidate_email}.");
     }
 
     public function show(Cases $case)

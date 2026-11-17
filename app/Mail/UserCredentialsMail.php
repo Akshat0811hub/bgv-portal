@@ -27,6 +27,7 @@ class UserCredentialsMail extends Mailable
     {
         return new Content(
             view: 'emails.user-credentials',
+            text: 'emails.text.user-credentials',
             with: [
                 'loginUrl' => route('login'),
             ],

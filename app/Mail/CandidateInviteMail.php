@@ -19,6 +19,7 @@ class CandidateInviteMail extends Mailable
         public Cases $case,
         public string $token,
         bool $reminder = false,
+        public bool $requestDocuments = true,
     ) {
         $this->reminder = $reminder;
     }
@@ -29,8 +30,8 @@ class CandidateInviteMail extends Mailable
         $caseNo = $this->case->case_number;
 
         $subject = $this->reminder
-            ? "Urgent Reminder: Upload Verification Documents for {$org} [{$caseNo}]"
-            : "Action Required: Upload Background Verification Documents for {$org} [{$caseNo}]";
+            ? "Reminder: Background verification for {$org} [{$caseNo}]"
+            : "Background verification for {$org} [{$caseNo}]";
 
         return new Envelope(subject: $subject);
     }
@@ -41,13 +42,13 @@ class CandidateInviteMail extends Mailable
             ->map(fn ($c) => ucwords(str_replace('_', ' ', $c->check_type)))
             ->values();
 
-        $baseUrl = (app()->bound('request') && request()->getHttpHost())
-            ? (request()->getSchemeAndHttpHost() . '/upload/' . $this->token)
-            : route('candidate.upload.show', $this->token);
+        // Honor Laravel's forced HTTPS scheme when running behind a proxy.
+        $baseUrl = route('candidate.upload.show', $this->token);
         $uploadUrl = $baseUrl . '?ctx=' . \App\Models\UploadToken::encodeSnapshot($this->case);
 
         return new Content(
             view: 'emails.candidate-invite',
+            text: 'emails.text.candidate-invite',
             with: [
                 'case' => $this->case,
                 'uploadUrl' => $uploadUrl,

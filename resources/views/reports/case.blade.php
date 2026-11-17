@@ -235,7 +235,10 @@
             <div class="h">Attached Evidence &amp; Documents ({{ $check->documents->count() }})</div>
             @foreach($check->documents as $doc)
             <div class="doc">
-                <a href="{{ route('documents.view', $doc) }}">{{ $doc->original_name }}</a>
+                <a href="{{ route('documents.view', $doc) }}" style="color:#0f2044;font-weight:bold;text-decoration:underline;">{{ $doc->original_name }}</a>
+                @if(isset($appendices[$doc->id]))
+                    <span class="meta2"> - Embedded in Appendix {{ $appendices[$doc->id] }} below</span>
+                @endif
                 <span class="meta2">
                     &nbsp;· {{ $doc->formatted_size }}{{ $doc->uploaded_by_role === 'admin' ? ' · Agency Verified Proof' : ' · Candidate Submitted' }}
                 </span>
@@ -256,6 +259,23 @@
 <div class="notes" style="margin-top:4px;">
     {{ $case->admin_notes }}
 </div>
+@endif
+
+@if(isset($documents) && $documents->isNotEmpty())
+<h2>Supporting Document Index</h2>
+<p>All documents below are included after this report, in appendix order.</p>
+<table class="summary">
+    <thead><tr><th>Appendix</th><th>Document</th><th>Check</th></tr></thead>
+    <tbody>
+    @foreach($documents as $doc)
+        <tr>
+            <td>{{ $appendices[$doc->id] }}</td>
+            <td>{{ $doc->original_name }}</td>
+            <td>{{ $doc->caseCheck ? ucwords(str_replace('_', ' ', $doc->caseCheck->check_type)) : 'General case document' }}</td>
+        </tr>
+    @endforeach
+    </tbody>
+</table>
 @endif
 
 </body>

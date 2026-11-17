@@ -6,7 +6,8 @@ use App\Models\CaseCheck;
 use App\Models\Cases;
 use App\Models\Check;
 use App\Models\Document;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Exceptions\ReportDocumentException;
+use App\Services\CaseReportBuilder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -63,15 +64,18 @@ trait StoresCaseDocuments
      */
     protected function caseReportPdf(Cases $case)
     {
-        $case->loadMissing('checks.documents', 'clientOrganization');
-
-        $schemas = Check::whereIn('slug', $case->checks->pluck('check_type'))->get()
-            ->mapWithKeys(fn ($c) => [$c->slug => $c->schema ?? []]);
-
-        $pdf = Pdf::loadView('reports.case', compact('case', 'schemas'));
+        try {
+            $pdf = app(CaseReportBuilder::class)->build($case);
+        } catch (ReportDocumentException $exception) {
+            return back()->with('error', $exception->getMessage());
+        }
         $name = Str::slug($case->candidate_name ?: 'candidate');
 
-        return $pdf->download("BGV_Report_{$name}.pdf");
+        return response($pdf, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="BGV_Report_'.$name.'.pdf"',
+            'Cache-Control' => 'private, no-store',
+        ]);
     }
 
     /**

@@ -70,7 +70,7 @@ class CaseController extends Controller
             'checks' => 'required|array|min:1|max:20',
             'checks.*' => ['required', 'string', 'in:'.implode(',', $validCheckSlugs)],
             'check_files' => 'nullable|array',
-            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
+            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,docx,txt',
         ]);
 
         $case = DB::transaction(function () use ($data) {
@@ -105,13 +105,8 @@ class CaseController extends Controller
         $case->uploadToken()->create(['token' => $token, 'expires_at' => now()->addDays(7)]);
         $case->load('uploadToken');
 
-        if (in_array($data['mode'], ['admin_upload', 'self_upload'])) {
-            return redirect()->route('admin.cases.show', $case)
-                ->with('success', 'Case created with the details you entered.');
-        }
-
-        // send_link: email the candidate.
-        $mailResult = $this->sendInvite($case, $token);
+        // Notify every candidate; request documents only in send-link mode.
+        $mailResult = $this->sendInvite($case, $token, requestDocuments: $data['mode'] === 'send_link');
 
         if ($mailResult['error']) {
             return redirect()->route('admin.cases.show', $case)
@@ -124,7 +119,7 @@ class CaseController extends Controller
         }
 
         return redirect()->route('admin.cases.show', $case)
-            ->with('success', "Case created and verification link emailed to {$case->candidate_email}.");
+            ->with('success', "Case created and notification emailed to {$case->candidate_email}.");
     }
 
     public function resendLink(Cases $case)
@@ -191,12 +186,12 @@ class CaseController extends Controller
         return back()->with('success', 'Insufficiency raised and the candidate has been notified.');
     }
 
-    private function sendInvite(Cases $case, string $token, bool $reminder = false): array
+    private function sendInvite(Cases $case, string $token, bool $reminder = false, bool $requestDocuments = true): array
     {
         $smtpConfigured = \App\Models\Setting::applyMailConfig();
 
         try {
-            Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token, $reminder));
+            Mail::to($case->candidate_email)->send(new CandidateInviteMail($case, $token, $reminder, $requestDocuments));
 
             return ['sent' => true, 'smtp' => $smtpConfigured, 'error' => null];
         } catch (\Throwable $e) {

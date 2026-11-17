@@ -13,6 +13,24 @@ class CreateUserTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['mail.default' => 'smtp']);
+    }
+
+    public function test_log_only_mode_warns_without_logging_credentials(): void
+    {
+        config(['mail.default' => 'log']);
+        Mail::fake();
+        $this->actingAs($this->admin())->post(route('admin.users.store'), [
+            'name' => 'Local Client', 'email' => 'local@acme.test', 'password' => 'temp12345',
+            'role' => 'organization', 'client_org_name' => 'Acme Corp',
+        ])->assertSessionHas('warning');
+        $this->assertDatabaseHas('users', ['email' => 'local@acme.test']);
+        Mail::assertNothingSent();
+    }
+
     private function admin(): User
     {
         return User::create([

@@ -43,6 +43,14 @@ class Setting extends Model
         $fromAddr = static::getValue('mail_from_address') ?: config('mail.from.address');
         $fromName = static::getValue('mail_from_name') ?: config('mail.from.name', 'Orbit Verify');
 
+        // Respect an explicit log-only selection even when .env uses SMTP.
+        Config::set('mail.default', $mailer);
+
+        // Never use Laravel's example sender for a real authenticated mailbox.
+        if ((! $fromAddr || $fromAddr === 'hello@example.com') && filter_var($username, FILTER_VALIDATE_EMAIL)) {
+            $fromAddr = $username;
+        }
+
         // Auto-correct Laravel's local default 127.0.0.1:2525 if a real email username was provided
         if (($host === '127.0.0.1' || empty($host)) && ! empty($username)) {
             if (str_ends_with(strtolower($username), '@gmail.com') || str_ends_with(strtolower($username), '@googlemail.com')) {

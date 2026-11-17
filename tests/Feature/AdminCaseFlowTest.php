@@ -43,6 +43,7 @@ class AdminCaseFlowTest extends TestCase
 
     public function test_admin_upload_mode_creates_case_and_captures_data(): void
     {
+        Mail::fake();
         Storage::fake('local');
 
         $response = $this->actingAs($this->admin)->post(route('admin.cases.store'), [
@@ -70,6 +71,9 @@ class AdminCaseFlowTest extends TestCase
         $this->assertNotNull($doc);
         $this->assertSame('admin', $doc->uploaded_by_role);
         $this->assertSame($this->admin->id, $doc->uploaded_by);
+        Mail::assertSent(CandidateInviteMail::class, fn ($mail) =>
+            $mail->hasTo('john@example.test') && ! $mail->requestDocuments
+        );
     }
 
     public function test_send_link_mode_emails_candidate(): void
@@ -86,7 +90,27 @@ class AdminCaseFlowTest extends TestCase
 
         $case = Cases::first();
         $this->assertNotNull($case->uploadToken);
-        Mail::assertSent(CandidateInviteMail::class, fn ($m) => $m->hasTo('link@example.test'));
+        Mail::assertSent(CandidateInviteMail::class, fn ($m) => $m->hasTo('link@example.test') && $m->requestDocuments);
+    }
+
+    public function test_client_creation_notifies_candidate_in_every_mode(): void
+    {
+        $client = User::create([
+            'name' => 'Client', 'email' => 'client@orbit.test', 'password' => 'secret123',
+            'role' => 'organization', 'is_verified' => true, 'client_organization_id' => $this->org->id,
+        ]);
+
+        foreach (['send_link', 'self_upload', 'admin_upload'] as $mode) {
+            Mail::fake();
+            $this->actingAs($client)->post(route('client.cases.store'), [
+                'candidate_name' => 'Candidate', 'candidate_email' => 'candidate@example.test',
+                'mode' => $mode, 'checks' => ['education_verification'],
+            ])->assertRedirect();
+            Mail::assertSent(CandidateInviteMail::class, fn ($mail) =>
+                $mail->hasTo('candidate@example.test') && $mail->requestDocuments === ($mode === 'send_link')
+            );
+            Mail::assertSentCount(1);
+        }
     }
 
     public function test_admin_can_download_pdf_report(): void

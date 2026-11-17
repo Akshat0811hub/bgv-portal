@@ -1,4 +1,4 @@
-<x-mail.shell heading="Background Verification Document Request">
+<x-mail.shell :heading="$requestDocuments ? 'Background Verification Document Request' : 'Background Verification Case Created'">
     <div style="font-size:15px;color:#0f2044;font-weight:600;margin-bottom:12px;">
         Dear {{ $case->candidate_name }},
     </div>
@@ -24,7 +24,7 @@
                 <td style="color:#0f2044;font-weight:600;padding-bottom:6px;">{{ $case->candidate_designation }}</td>
             </tr>
             @endif
-            @if($expiresAt)
+            @if($requestDocuments && $expiresAt)
             <tr>
                 <td style="color:#64748b;">Upload Valid Until:</td>
                 <td style="color:#b45309;font-weight:600;">{{ $expiresAt->format('d M Y, h:i A') }}</td>
@@ -51,6 +51,7 @@
     </div>
     @endif
 
+    @if($requestDocuments)
     {{-- Call to action button --}}
     <div style="text-align:center;margin:28px 0 24px 0;">
         <a href="{{ $uploadUrl }}"
@@ -66,7 +67,11 @@
         <a href="{{ $uploadUrl }}" style="color:#0d9488;text-decoration:underline;">{{ $uploadUrl }}</a>
     </div>
 
+    @else
+    <p>Your organization is handling document submission. No upload is requested in this email.</p>
+    @endif
+
     <div style="font-size:12px;color:#64748b;line-height:1.5;border-top:1px solid #e2e8f0;padding-top:16px;">
-        <strong style="color:#0f2044;">Security Guarantee:</strong> Your data is protected by 256-bit encryption. Uploaded documents are solely utilized for authorized employment verification purposes.
+        Keep your verification link private. If you were not expecting this verification, contact your hiring organization before sharing documents.
     </div>
 </x-mail.shell>
