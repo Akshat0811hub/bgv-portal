@@ -3,7 +3,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build && node -e \"const fs=require('fs'); if(!fs.existsSync('dist')){fs.mkdirSync('dist'); fs.writeFileSync('dist/index.html', '<script>window.location.href=\\\"/\\\";</script>');}\"",
+        "build": "vite build",
         "dev": "vite"
     },
     "devDependencies": {
