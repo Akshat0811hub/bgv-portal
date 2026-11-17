@@ -100,20 +100,21 @@ class CaseController extends Controller
         $this->captureCheckSubmission($request, $case, 'admin');
         $case->syncStatusAndCloseDate();
 
+        // Always generate a token so the case has an active upload link ready to copy/share anytime.
+        $token = Str::random(48);
+        $case->uploadToken()->create(['token' => $token, 'expires_at' => now()->addDays(7)]);
+        $case->load('uploadToken');
+
         if (in_array($data['mode'], ['admin_upload', 'self_upload'])) {
             return redirect()->route('admin.cases.show', $case)
                 ->with('success', 'Case created with the details you entered.');
         }
 
-        // send_link: also generate a token + email the candidate.
-        $token = Str::random(48);
-        $case->uploadToken()->create(['token' => $token, 'expires_at' => now()->addDays(7)]);
-        $case->load('uploadToken');
-
+        // send_link: email the candidate.
         $this->sendInvite($case, $token);
 
         return redirect()->route('admin.cases.show', $case)
-            ->with('success', 'Case created and upload link sent to the candidate.');
+            ->with('success', "Case created and verification link sent to {$case->candidate_email}.");
     }
 
     public function resendLink(Cases $case)

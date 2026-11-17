@@ -377,8 +377,13 @@
                     </div>
                     <div class="flex items-center gap-1.5 bg-[#f8fafc] border border-[#e2e8f0] rounded-lg p-2">
                         <div class="text-xs font-mono text-[#0d9488] truncate flex-1">{{ route('candidate.upload.show', $case->uploadToken->token) }}</div>
+                        <a href="{{ route('candidate.upload.show', $case->uploadToken->token) }}" target="_blank"
+                           class="btn-teal btn-sm !px-2.5 !py-1 shrink-0 text-xs inline-flex items-center gap-1">
+                            <span>Open</span>
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                        </a>
                         <button type="button" @click="navigator.clipboard.writeText(url); copied = true; setTimeout(() => copied = false, 2000)"
-                                class="btn-outline btn-sm !px-2 !py-1 shrink-0">
+                                class="btn-outline btn-sm !px-2.5 !py-1 shrink-0">
                             <span x-show="!copied">Copy</span>
                             <span x-show="copied" class="text-emerald-600" style="display:none">Copied!</span>
                         </button>

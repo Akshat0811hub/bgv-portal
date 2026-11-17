@@ -90,6 +90,133 @@
                             </div>
                         </div>
 
+                    @elseif($name === 'aadhaar')
+                        {{-- Aadhaar: Only digits, formatted as XXXX-XXXX-XXXX (12 digits) --}}
+                        <div class="sm:col-span-1" x-data="{
+                            val: '{{ $value }}',
+                            format(e) {
+                                let digits = e.target.value.replace(/\D/g, '').substring(0, 12);
+                                let parts = [];
+                                for (let i = 0; i < digits.length; i += 4) {
+                                    parts.push(digits.substring(i, i + 4));
+                                }
+                                this.val = parts.join('-');
+                                e.target.value = this.val;
+                            }
+                        }">
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <input type="text"
+                                   id="{{ $inputId }}"
+                                   name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
+                                   :value="val"
+                                   @input="format($event)"
+                                   maxlength="14"
+                                   inputmode="numeric"
+                                   placeholder="1234-5678-9012"
+                                   class="form-input font-mono tracking-wider">
+                            <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                12-digit UIDAI number (Numbers only, e.g. 1234-5678-9012)
+                            </p>
+                        </div>
+
+                    @elseif($name === 'pan')
+                        {{-- PAN: Uppercase only, 5 letters + 4 digits + 1 letter (ABCDE1234F) --}}
+                        <div class="sm:col-span-1" x-data="{
+                            val: '{{ strtoupper($value) }}',
+                            format(e) {
+                                let raw = e.target.value.toUpperCase();
+                                let clean = '';
+                                for (let i = 0; i < raw.length && clean.length < 10; i++) {
+                                    let ch = raw[i];
+                                    let pos = clean.length;
+                                    if (pos < 5) {
+                                        if (/[A-Z]/.test(ch)) clean += ch;
+                                    } else if (pos < 9) {
+                                        if (/[0-9]/.test(ch)) clean += ch;
+                                    } else if (pos === 9) {
+                                        if (/[A-Z]/.test(ch)) clean += ch;
+                                    }
+                                }
+                                this.val = clean;
+                                e.target.value = clean;
+                            }
+                        }">
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <input type="text"
+                                   id="{{ $inputId }}"
+                                   name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
+                                   :value="val"
+                                   @input="format($event)"
+                                   maxlength="10"
+                                   placeholder="ABCDE1234F"
+                                   class="form-input font-mono tracking-wider uppercase">
+                            <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                10-char PAN (5 letters, 4 numbers, 1 letter, e.g. ABCDE1234F)
+                            </p>
+                        </div>
+
+                    @elseif(in_array($name, ['drivingLicence', 'driving_licence', 'dl']))
+                        {{-- Driving License: Uppercase, 2 letters state code + digits (DL-0420110012345) --}}
+                        <div class="sm:col-span-1" x-data="{
+                            val: '{{ strtoupper($value) }}',
+                            format(e) {
+                                let raw = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                                let clean = '';
+                                for (let i = 0; i < raw.length && clean.length < 15; i++) {
+                                    let ch = raw[i];
+                                    let pos = clean.length;
+                                    if (pos < 2) {
+                                        if (/[A-Z]/.test(ch)) clean += ch;
+                                    } else {
+                                        if (/[0-9]/.test(ch)) clean += ch;
+                                    }
+                                }
+                                let formatted = '';
+                                if (clean.length > 0) formatted += clean.substring(0, 2);
+                                if (clean.length > 2) formatted += '-' + clean.substring(2, 4);
+                                if (clean.length > 4) formatted += clean.substring(4, 15);
+                                this.val = formatted;
+                                e.target.value = formatted;
+                            }
+                        }">
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <input type="text"
+                                   id="{{ $inputId }}"
+                                   name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
+                                   :value="val"
+                                   @input="format($event)"
+                                   maxlength="16"
+                                   placeholder="DL-0420150012345"
+                                   class="form-input font-mono tracking-wider uppercase">
+                            <p class="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5 text-teal-600 inline shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                Format: State Code (2 letters) + RTO &amp; Number (e.g. DL-0420150012345)
+                            </p>
+                        </div>
+
+                    @elseif($name === 'pincode')
+                        {{-- Pincode: 6 digits only --}}
+                        <div class="sm:col-span-1" x-data="{
+                            val: '{{ $value }}',
+                            format(e) {
+                                this.val = e.target.value.replace(/\D/g, '').substring(0, 6);
+                                e.target.value = this.val;
+                            }
+                        }">
+                            <label class="form-label" for="{{ $inputId }}">{{ $label }}</label>
+                            <input type="text"
+                                   id="{{ $inputId }}"
+                                   name="check_data[{{ $slug }}][{{ $section }}][{{ $name }}]"
+                                   :value="val"
+                                   @input="format($event)"
+                                   maxlength="6"
+                                   inputmode="numeric"
+                                   placeholder="110001"
+                                   class="form-input font-mono">
+                        </div>
+
                     @else
                         {{-- Text / date --}}
                         <div @class(['sm:col-span-2' => in_array($name, ['address', 'reason', 'handles'])])>

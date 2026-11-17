@@ -25,9 +25,12 @@ class CandidateInviteMail extends Mailable
 
     public function envelope(): Envelope
     {
+        $org = $this->case->clientOrganization->name ?? 'Orbit Verify';
+        $caseNo = $this->case->case_number;
+
         $subject = $this->reminder
-            ? 'Reminder: Upload Your Documents - Orbit Verify'
-            : 'Action Required: Upload Your Documents - Orbit Verify';
+            ? "Urgent Reminder: Upload Verification Documents for {$org} [{$caseNo}]"
+            : "Action Required: Upload Background Verification Documents for {$org} [{$caseNo}]";
 
         return new Envelope(subject: $subject);
     }
@@ -41,8 +44,9 @@ class CandidateInviteMail extends Mailable
         return new Content(
             view: 'emails.candidate-invite',
             with: [
+                'case' => $this->case,
                 'uploadUrl' => route('candidate.upload.show', $this->token),
-                'organizationName' => $this->case->clientOrganization->name ?? 'Your employer',
+                'organizationName' => $this->case->clientOrganization->name ?? 'Your Hiring Organization',
                 'checkNames' => $checkNames,
                 'expiresAt' => optional($this->case->uploadToken)->expires_at,
             ],
