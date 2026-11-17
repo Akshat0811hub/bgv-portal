@@ -37,12 +37,19 @@ $mysqlPort = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? '3306');
 $mysqlDb   = getenv('DB_DATABASE') ?: ($_ENV['DB_DATABASE'] ?? '');
 $mysqlUser = getenv('DB_USERNAME') ?: ($_ENV['DB_USERNAME'] ?? '');
 $mysqlPass = getenv('DB_PASSWORD') ?: ($_ENV['DB_PASSWORD'] ?? '');
-$dbUrl     = getenv('DB_URL') ?: ($_ENV['DB_URL'] ?? '');
+$dbUrl     = getenv('DB_URL') ?: ($_ENV['DB_URL'] ?? (getenv('DATABASE_URL') ?: ($_ENV['DATABASE_URL'] ?? (getenv('POSTGRES_URL') ?: ($_ENV['POSTGRES_URL'] ?? '')))));
 
 $externalReady = false;
 
 if ($dbUrl !== '') {
     $externalReady = true;
+    putenv("DB_URL={$dbUrl}");
+    $_ENV['DB_URL'] = $dbUrl;
+    if (empty(getenv('DB_CONNECTION')) && empty($_ENV['DB_CONNECTION'])) {
+        $conn = str_starts_with($dbUrl, 'postgres') ? 'pgsql' : 'mysql';
+        putenv("DB_CONNECTION={$conn}");
+        $_ENV['DB_CONNECTION'] = $conn;
+    }
 } elseif ($mysqlHost !== '' && $mysqlDb !== '' && $mysqlUser !== '' && extension_loaded('pdo_mysql')) {
     try {
         $dsn = "mysql:host={$mysqlHost};port={$mysqlPort};dbname={$mysqlDb};charset=utf8mb4";
