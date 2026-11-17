@@ -34,12 +34,25 @@
                         <div class="sm:col-span-2" x-data="{
                             files: [],
                             dragging: false,
+                            addFiles(incoming) {
+                                const selected = [...this.files, ...incoming];
+                                this.files = selected.filter((file, index) => selected.findIndex(other => (other.webkitRelativePath || other.name) === (file.webkitRelativePath || file.name) && other.size === file.size && other.lastModified === file.lastModified) === index);
+                                this.syncFiles();
+                            },
+                            syncFiles() {
+                                const transfer = new DataTransfer();
+                                this.files.forEach(file => transfer.items.add(file));
+                                this.$refs.fileInput.files = transfer.files;
+                            },
+                            removeFile(index) {
+                                this.files.splice(index, 1);
+                                this.syncFiles();
+                            },
                             handleDrop(e) {
                                 this.dragging = false;
                                 const dt = e.dataTransfer;
                                 if (dt && dt.files && dt.files.length) {
-                                    this.$refs.fileInput.files = dt.files;
-                                    this.files = [...dt.files];
+                                    this.addFiles([...dt.files]);
                                 }
                             }
                         }">
@@ -50,25 +63,33 @@
                                  @dragover.prevent="dragging = true"
                                  @dragleave.prevent="dragging = false"
                                  @drop.prevent="handleDrop($event)">
-                                <input type="file" x-ref="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.txt"
+                                <input type="file" x-ref="fileInput" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.odt,.rtf,.txt,.csv,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.odg,.odf,.fodt,.fods,.fodp"
                                        id="{{ $inputId }}"
                                        name="check_files[{{ $slug }}][{{ $name }}][]"
                                        class="hidden"
                                        @click.stop
-                                       @change="files = [...$event.target.files]">
+                                       @change="addFiles([...$event.target.files])">
                                 <div class="pointer-events-none">
                                     <svg class="w-8 h-8 mx-auto mb-2 text-[#0d9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
                                     <span class="text-sm font-semibold text-[#0f2044]">Click to choose files or drag &amp; drop here</span>
-                                    <span class="block text-xs text-[#64748b] mt-1">Supported: PDF, Word (.docx), JPG, PNG, WebP, TXT (Max 10MB per file)</span>
+                                    <span class="block text-xs text-[#64748b] mt-1">PDF, images, Word, OpenDocument, Excel, PowerPoint and text · up to 10 MB per file</span>
                                 </div>
                                 <div class="mt-3 space-y-1.5" x-show="files.length > 0" style="display:none">
                                     <template x-for="(f, i) in files" :key="i">
                                         <div class="flex items-center justify-between text-xs font-medium text-emerald-800 bg-emerald-100/80 border border-emerald-300 rounded-lg px-3 py-1.5 text-left">
-                                            <span class="truncate" x-text="'✓ ' + f.name"></span>
-                                            <span class="text-[11px] text-emerald-700 ml-2 shrink-0" x-text="(f.size / 1024).toFixed(1) + ' KB'"></span>
+                                            <span class="truncate" x-text="f.webkitRelativePath || f.name"></span>
+                                            <div class="flex items-center gap-2 shrink-0 ml-2">
+                                                <span class="text-[11px] text-emerald-700" x-text="(f.size / 1024).toFixed(1) + ' KB'"></span>
+                                                <button type="button" @click.stop="removeFile(i)" class="px-1 text-emerald-900 hover:text-red-700" :aria-label="'Remove ' + f.name">×</button>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>
+                            </div>
+                            <div class="mt-2 flex flex-wrap items-center gap-3">
+                                <button type="button" @click="$refs.folderInput.click()" class="text-xs font-semibold text-[#0d9488] hover:underline">Add files from a folder</button>
+                                <span class="text-[11px] text-[#94a3b8]">You can keep adding multiple files before submitting.</span>
+                                <input type="file" x-ref="folderInput" webkitdirectory multiple class="hidden" @change="addFiles([...$event.target.files]); $event.target.value = ''" aria-label="Choose a document folder">
                             </div>
                         </div>
 

@@ -15,40 +15,20 @@
     </div>
     <a href="{{ route('client.cases.report', $case) }}" class="btn-teal">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-        Download PDF Report
+        Download Complete Report
     </a>
 </div>
 
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-5">
+<div class="case-workspace grid grid-cols-1 xl:grid-cols-3 gap-5">
 
     {{-- Checks --}}
     <div class="xl:col-span-2 space-y-4">
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h2 class="font-semibold text-[#0f2044]">Verification Progress</h2>
-                    @php
-                        $total = $case->checks->count();
-                        $done  = $case->checks->whereIn('status', ['Clear','Completed','Failed','Discrepancy Found','Amber'])->count();
-                        $pct   = $total > 0 ? round($done / $total * 100) : 0;
-                    @endphp
-                    <p class="text-xs text-[#64748b] mt-0.5">{{ $done }} of {{ $total }} checks completed ({{ $pct }}%)</p>
-                </div>
-                <span class="badge bg-[#0f2044]/10 text-[#0f2044]">{{ $done }}/{{ $total }} Verified</span>
-            </div>
-            {{-- Progress bar --}}
-            <div class="px-6 pb-4 pt-3 bg-[#f8fafc]/50 rounded-b-xl">
-                <div class="w-full bg-[#e2e8f0] rounded-full h-2 overflow-hidden">
-                    <div class="bg-[#0d9488] h-2 rounded-full transition-all duration-500"
-                         style="width: {{ $pct }}%"></div>
-                </div>
-            </div>
-        </div>
+        <x-case-progress :case="$case" />
 
         @foreach($case->checks as $check)
         <div class="card overflow-hidden">
-            <div class="card-header bg-[#f8fafc]/60">
-                <div class="flex items-center gap-3">
+            <div class="card-header bg-[#f8fafc]/60 !items-start gap-3">
+                <div class="flex items-center gap-3 min-w-0">
                     <div class="w-9 h-9 rounded-xl
                         @if($check->status === 'Clear' || $check->status === 'Completed') bg-emerald-100 text-emerald-600
                         @elseif($check->status === 'Discrepancy Found' || $check->status === 'Failed') bg-red-100 text-red-600
@@ -69,33 +49,12 @@
                 <x-status-badge :status="$check->status" />
             </div>
 
-            <div class="p-6 space-y-5">
+            <div class="p-4 sm:p-6 space-y-5">
                 @php
                     $schema = $check->effectiveSchema($schemas[$check->check_type] ?? []);
-                    $hasVerified = !empty($check->verified_data);
                 @endphp
 
-                @if($check->form_data || $hasVerified)
-                <div class="grid grid-cols-1 {{ $hasVerified ? 'lg:grid-cols-2' : '' }} gap-4">
-                    <div>
-                        <p class="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2">Candidate Stated Details</p>
-                        <x-check-summary :schema="$schema" :data="$check->form_data ?? []" />
-                    </div>
-                    @if($hasVerified)
-                    <div>
-                        <p class="text-xs font-semibold text-[#0d9488] uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            Agency Verified Findings
-                        </p>
-                        <div class="ring-1 ring-[#0d9488]/25 rounded-lg overflow-hidden">
-                            <x-check-summary :schema="$schema" :data="$check->verified_data ?? []" />
-                        </div>
-                    </div>
-                    @endif
-                </div>
-                @else
-                <p class="text-sm text-[#94a3b8] italic">No details submitted for this check yet.</p>
-                @endif
+                <x-check-comparison :schema="$schema" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
 
                 @if($check->comments)
                 <div>
@@ -104,39 +63,7 @@
                 </div>
                 @endif
 
-                @if($check->documents->isNotEmpty())
-                <div>
-                    <p class="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2">Attached Documents ({{ $check->documents->count() }})</p>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        @foreach($check->documents as $doc)
-                        <div class="flex items-center justify-between bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5">
-                            <div class="min-w-0 pr-2">
-                                <div class="text-sm font-medium text-[#1e293b] truncate" title="{{ $doc->original_name }}">{{ $doc->original_name }}</div>
-                                <div class="text-xs text-[#64748b]">
-                                    {{ $doc->formatted_size }}
-                                    @if($doc->uploaded_by_role === 'admin')
-                                        <span class="text-teal-700 font-semibold">· Verified Proof</span>
-                                    @elseif($doc->uploaded_by_role === 'client')
-                                        <span>· Uploaded by HR</span>
-                                    @endif
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5 shrink-0">
-                                <a href="{{ route('documents.view', $doc) }}" target="_blank" class="btn-outline btn-sm">View</a>
-                                @if($doc->uploaded_by_role === 'client' && !$case->isCompletedStatus())
-                                <form method="POST" action="{{ route('documents.destroy', $doc) }}" onsubmit="return confirm('Remove this document?')">
-                                    @csrf @method('DELETE')
-                                    <button type="submit" class="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors" title="Remove document">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    </button>
-                                </form>
-                                @endif
-                            </div>
-                        </div>
-                        @endforeach
-                    </div>
-                </div>
-                @endif
+                <x-check-documents :check="$check" :case="$case" :schema="$schema" />
 
                 {{-- Allow HR to upload additional documents for Pending / Insufficiency / In Progress checks --}}
                 @if(!$case->isCompletedStatus())
@@ -147,7 +74,7 @@
                     </button>
                     <form x-show="openUpload" x-collapse style="display:none" method="POST" action="{{ route('client.cases.checks.documents', [$case, $check]) }}" enctype="multipart/form-data" class="mt-2.5 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
                         @csrf
-                        <input type="file" name="files[]" multiple required accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-input !py-1.5 !text-xs flex-1">
+                        <input type="file" name="files[]" multiple required accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.odt,.rtf,.txt,.csv,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.odg,.odf,.fodt,.fods,.fodp" class="form-input !py-1.5 !text-xs flex-1">
                         <button type="submit" class="btn-teal btn-sm shrink-0">Upload File(s)</button>
                     </form>
                 </div>

@@ -62,7 +62,7 @@ class CaseController extends Controller
             'checks' => 'required|array|min:1|max:20',
             'checks.*' => ['required', 'string', 'in:'.implode(',', $validCheckSlugs)],
             'check_files' => 'nullable|array',
-            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,docx,txt',
+            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
         ]);
 
         $user = auth()->user();
@@ -211,7 +211,7 @@ class CaseController extends Controller
 
         $request->validate([
             'files' => 'required|array|min:1|max:5',
-            'files.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
+            'files.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
         ]);
 
         foreach ((array) $request->file('files', []) as $file) {

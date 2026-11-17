@@ -17,36 +17,17 @@
     <div class="flex items-center gap-2.5">
         <a href="{{ route('admin.cases.report', $case) }}" class="btn-teal">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-            Download PDF Report
+            Download Complete Report
         </a>
     </div>
 </div>
 
-@php
-    $totalChecks = $case->checks->count();
-    $doneChecks  = $case->checks->whereIn('status', ['Clear', 'Completed', 'Failed', 'Discrepancy Found', 'Amber'])->count();
-    $pctDone     = $totalChecks > 0 ? round($doneChecks / $totalChecks * 100) : 0;
-@endphp
-
-<div class="grid grid-cols-1 xl:grid-cols-3 gap-5" x-data="{ expandAll: true }">
+<div class="case-workspace grid grid-cols-1 xl:grid-cols-3 gap-5" x-data="{ expandAll: true }">
 
     {{-- Checks column --}}
     <div class="xl:col-span-2 space-y-4">
 
-        <div class="card">
-            <div class="card-header">
-                <div>
-                    <h2 class="font-semibold text-[#0f2044]">Verification Checks</h2>
-                    <p class="text-xs text-[#64748b] mt-0.5">{{ $doneChecks }} of {{ $totalChecks }} checks verified ({{ $pctDone }}%)</p>
-                </div>
-                <span class="badge bg-[#0f2044]/10 text-[#0f2044]">{{ $totalChecks }} {{ $totalChecks === 1 ? 'Check' : 'Checks' }}</span>
-            </div>
-            <div class="px-6 pb-4 pt-3 bg-[#f8fafc]/50 rounded-b-xl">
-                <div class="w-full bg-[#e2e8f0] rounded-full h-2 overflow-hidden">
-                    <div class="bg-[#0d9488] h-2 rounded-full transition-all duration-500" style="width: {{ $pctDone }}%"></div>
-                </div>
-            </div>
-        </div>
+        <x-case-progress :case="$case" />
 
         @forelse($case->checks as $idx => $check)
         @php
@@ -62,7 +43,7 @@
             };
         @endphp
         <div class="card overflow-hidden" x-data="{ open: {{ $idx === 0 || in_array($check->status, ['In Progress', 'Pending', 'Insufficiency']) ? 'true' : 'false' }}, customizeOpen: false, newFields: [] }">
-            <div class="w-full card-header hover:bg-[#f8fafc]/80 transition-colors flex items-center justify-between gap-3 cursor-pointer" @click="open = !open">
+            <div class="w-full card-header hover:bg-[#f8fafc]/80 transition-colors flex flex-wrap items-center justify-between gap-3 cursor-pointer" @click="open = !open">
                 <div class="flex items-center gap-3 min-w-0">
                     <div class="w-9 h-9 rounded-xl
                         @if(in_array($check->status, ['Clear', 'Completed'])) bg-emerald-100 text-emerald-600
@@ -98,6 +79,7 @@
                         <select name="status" onchange="this.form.submit()" title="Quick Status (Green: Passed, Orange: Pending, Red: Failed)"
                                 class="text-xs font-semibold rounded-full border px-3 py-1.5 pr-7 cursor-pointer focus:outline-none focus:ring-2 transition-all {{ $statusStyle }}">
                             <option value="Clear" @selected($check->status === 'Clear') class="bg-white text-emerald-700 font-semibold">🟢 Passed (Green)</option>
+                            <option value="Completed" @selected($check->status === 'Completed') class="bg-white text-emerald-700">Completed</option>
                             <option value="Pending" @selected($check->status === 'Pending') class="bg-white text-amber-700 font-semibold">🟠 Pending (Orange)</option>
                             <option value="Failed" @selected($check->status === 'Failed') class="bg-white text-rose-700 font-semibold">🔴 Failed (Red)</option>
                             <option disabled class="text-slate-300">──────────</option>
@@ -114,11 +96,11 @@
             </div>
 
             <div x-show="open">
-                <div class="p-6 space-y-6 bg-white">
+                <div class="p-4 sm:p-6 space-y-6 bg-white">
 
                     {{-- Customize Check Fields Toolbar & Inline Editor --}}
                     <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-[#f1f5f9]">
-                        <p class="section-label !mb-0">Candidate Stated Details</p>
+                        <p class="section-label !mb-0">Check Configuration</p>
                         <button type="button" @click="customizeOpen = !customizeOpen"
                                 class="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors"
                                 :class="customizeOpen ? 'bg-[#0f2044] text-white border-[#0f2044]' : 'bg-white text-[#0f2044] border-[#cbd5e1] hover:border-[#0d9488] hover:text-[#0d9488]'">
@@ -210,50 +192,9 @@
                         </form>
                     </div>
 
-                    {{-- Candidate-submitted data (schema-aware) --}}
-                    <div>
-                        <x-check-summary :schema="$schema" :data="$check->form_data ?? []" />
-                    </div>
+                    <x-check-comparison :schema="$schema" :stated="$check->form_data ?? []" :verified="$check->verified_data ?? []" />
 
-                    {{-- Documents --}}
-                    @if($check->documents->isNotEmpty())
-                    <div>
-                        <p class="section-label">Attached Documents ({{ $check->documents->count() }})</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            @foreach($check->documents as $doc)
-                            <div class="flex items-center justify-between bg-[#f8fafc] border border-[#e2e8f0] rounded-xl px-3.5 py-2.5 hover:border-[#cbd5e1] transition-colors">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <div class="w-8 h-8 rounded-lg bg-white border border-[#e2e8f0] flex items-center justify-center shrink-0">
-                                        <svg class="w-4 h-4 text-[#0d9488]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
-                                    </div>
-                                    <div class="min-w-0">
-                                        <div class="text-sm font-medium text-[#1e293b] truncate" title="{{ $doc->original_name }}">{{ $doc->original_name }}</div>
-                                        <div class="flex items-center gap-1.5 text-xs text-[#64748b]">
-                                            <span>{{ $doc->formatted_size }}</span>
-                                            @if($doc->uploaded_by_role === 'admin')
-                                                <span class="text-teal-700 font-semibold">· Agency Verified</span>
-                                            @elseif($doc->uploaded_by_role === 'client')
-                                                <span>· Client</span>
-                                            @else
-                                                <span>· Candidate</span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-1.5 shrink-0 ml-2">
-                                    <a href="{{ route('documents.view', $doc) }}" target="_blank" class="btn-outline btn-sm">View</a>
-                                    <form method="POST" action="{{ route('documents.destroy', $doc) }}" onsubmit="return confirm('Remove this document?')">
-                                        @csrf @method('DELETE')
-                                        <button type="submit" class="p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors" title="Delete document">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            @endforeach
-                        </div>
-                    </div>
-                    @endif
+                    <x-check-documents :check="$check" :case="$case" :schema="$schema" />
 
                     {{-- Update form: verified details + status --}}
                     <div class="border-t border-[#e2e8f0] pt-5" x-data="{
@@ -331,7 +272,7 @@
                                 </div>
                                 <div>
                                     <label class="form-label">Attach Verified Proof / Evidence</label>
-                                    <input type="file" name="verified_files[]" multiple accept=".pdf,.jpg,.jpeg,.png,.webp" class="form-input !py-2">
+                                    <input type="file" name="verified_files[]" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.odt,.rtf,.txt,.csv,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.odg,.odf,.fodt,.fods,.fodp" class="form-input !py-2">
                                 </div>
                             </div>
                             <div class="mt-4">

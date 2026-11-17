@@ -169,7 +169,7 @@
                     @else
                         {{-- Fallback: schema unknown, allow generic file upload --}}
                         <label class="form-label">Upload Supporting Documents</label>
-                        <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.docx,.txt"
+                        <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.odt,.rtf,.txt,.csv,.xls,.xlsx,.ods,.ppt,.pptx,.odp,.odg,.odf,.fodt,.fods,.fodp"
                                name="check_files[{{ $check->check_type }}][_file][]" class="form-input">
                     @endif
                 </div>

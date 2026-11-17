@@ -24,7 +24,7 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Auto-initialize schema & default users on fresh cloud databases (e.g. Hostinger MySQL / Neon / TiDB)
-        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready_v2')) {
+        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready_v3')) {
             try {
                 if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
@@ -32,11 +32,12 @@ class AppServiceProvider extends ServiceProvider
                 } elseif (
                     ! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content') ||
                     ! \Illuminate\Support\Facades\Schema::hasColumn('case_checks', 'custom_schema') ||
-                    ! \Illuminate\Support\Facades\Schema::hasTable('settings')
+                    ! \Illuminate\Support\Facades\Schema::hasTable('settings') ||
+                    ! \Illuminate\Support\Facades\Schema::hasTable('report_downloads')
                 ) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 }
-                @touch(sys_get_temp_dir() . '/.orbit_db_ready_v2');
+                @touch(sys_get_temp_dir() . '/.orbit_db_ready_v3');
             } catch (\Throwable $e) {
                 // Database connection not ready yet
             }

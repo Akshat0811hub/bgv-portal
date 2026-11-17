@@ -8,6 +8,7 @@ use App\Models\Check;
 use App\Models\Document;
 use App\Exceptions\ReportDocumentException;
 use App\Services\CaseReportBuilder;
+use App\Services\ReportDownload;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
@@ -66,16 +67,10 @@ trait StoresCaseDocuments
     {
         try {
             $pdf = app(CaseReportBuilder::class)->build($case);
+            return app(ReportDownload::class)->response($case, $pdf);
         } catch (ReportDocumentException $exception) {
             return back()->with('error', $exception->getMessage());
         }
-        $name = Str::slug($case->candidate_name ?: 'candidate');
-
-        return response($pdf, 200, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="BGV_Report_'.$name.'.pdf"',
-            'Cache-Control' => 'private, no-store',
-        ]);
     }
 
     /**

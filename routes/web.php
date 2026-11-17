@@ -14,6 +14,7 @@ use App\Http\Controllers\Client\DashboardController as ClientDashboard;
 use App\Http\Controllers\Client\ProfileController as ClientProfile;
 use App\Http\Controllers\Client\ReportController as ClientReport;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\ReportDownloadController;
 use App\Http\Middleware\AdminMiddleware;
 use App\Http\Middleware\ClientMiddleware;
 use Illuminate\Support\Facades\Route;
@@ -106,6 +107,9 @@ Route::middleware(['auth', ClientMiddleware::class])->prefix('client')->name('cl
 });
 
 // ── Document serving & removal (auth required) ───────────────────────────────
+Route::get('/reports/downloads/{download}/parts/{part}', [ReportDownloadController::class, 'part'])
+    ->whereUuid('download')->whereNumber('part')->name('reports.download.part')->middleware('auth');
+
 Route::get('/documents/{document}/view', [DocumentController::class, 'view'])
     ->name('documents.view')
     ->middleware('auth');

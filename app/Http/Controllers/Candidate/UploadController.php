@@ -38,7 +38,7 @@ class UploadController extends Controller
             'check_files' => 'nullable|array',
             'check_files.*' => 'nullable|array',
             'check_files.*.*' => 'nullable',
-            'check_files.*.*.*' => 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,webp,docx,txt',
+            'check_files.*.*.*' => 'nullable|file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
         ]);
 
         $case = $uploadToken->case;

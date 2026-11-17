@@ -70,7 +70,7 @@ class CaseController extends Controller
             'checks' => 'required|array|min:1|max:20',
             'checks.*' => ['required', 'string', 'in:'.implode(',', $validCheckSlugs)],
             'check_files' => 'nullable|array',
-            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,docx,txt',
+            'check_files.*.*.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
         ]);
 
         $case = DB::transaction(function () use ($data) {
@@ -274,7 +274,7 @@ class CaseController extends Controller
             'comments' => 'nullable|string|max:5000',
             'verified_data' => 'nullable|array',
             'verified_files' => 'nullable|array|max:10',
-            'verified_files.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp',
+            'verified_files.*' => 'file|max:10240|mimes:pdf,jpg,jpeg,png,webp,doc,docx,odt,rtf,txt,csv,xls,xlsx,ods,ppt,pptx,odp,odg,odf,fodt,fods,fodp',
         ]);
 
         $update = [
