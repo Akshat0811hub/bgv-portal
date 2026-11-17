@@ -12,6 +12,8 @@ use setasign\Fpdi\PdfParser\StreamReader;
 
 class CaseReportBuilder
 {
+    private const VERCEL_MAX_PAYLOAD_BYTES = 4_200_000;
+
     public function build(Cases $case): string
     {
         $case->loadMissing('checks.documents', 'clientOrganization');
@@ -21,7 +23,7 @@ class CaseReportBuilder
         // Include every document belonging to this case, once, in a stable order.
         $documents = $case->documents()->with('caseCheck')->orderBy('case_check_id')->orderBy('id')->get();
         $appendices = $documents->values()->mapWithKeys(fn ($doc, $index) => [$doc->id => $index + 1]);
-        $report = Pdf::loadView('reports.case', compact('case', 'schemas', 'documents', 'appendices'))->output();
+        $report = $this->renderPdf('reports.case', compact('case', 'schemas', 'documents', 'appendices'));
 
         if ($documents->isEmpty()) {
             return $report;
@@ -33,13 +35,16 @@ class CaseReportBuilder
         $merged->SetAuthor('Orbit Verify');
         $this->appendPdf($merged, $report);
 
+        $runningBytes = strlen($report);
+
         foreach ($documents as $document) {
-            $divider = Pdf::loadView('reports.appendix', [
+            $divider = $this->renderPdf('reports.appendix', [
                 'case' => $case,
                 'document' => $document,
                 'number' => $appendices[$document->id],
-            ])->output();
+            ]);
             $this->appendPdf($merged, $divider);
+            $runningBytes += strlen($divider);
 
             try {
                 $bytes = $this->readDocument($document);
@@ -47,23 +52,48 @@ class CaseReportBuilder
                 $ext = strtolower(pathinfo($document->original_name ?? '', PATHINFO_EXTENSION));
 
                 if ($mime === 'application/pdf' || $ext === 'pdf') {
-                    $this->appendPdf($merged, $bytes);
+                    $piece = $bytes;
                 } elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
-                    $this->appendPdf($merged, $this->imagePdf($bytes, $mime));
+                    $piece = $this->imagePdf($bytes, $mime);
                 } elseif ($ext === 'docx' || $mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-                    $this->appendPdf($merged, $this->docxPdf($bytes, $document->original_name));
+                    $piece = $this->docxPdf($bytes, $document->original_name);
                 } elseif (str_starts_with((string) $mime, 'text/') || in_array($ext, ['txt', 'csv', 'log'], true)) {
-                    $this->appendPdf($merged, $this->textPdf($bytes, $document->original_name));
+                    $piece = $this->textPdf($bytes, $document->original_name);
                 } else {
-                    $this->appendPdf($merged, $this->fallbackPdf($document));
+                    $piece = $this->fallbackPdf($document);
                 }
+
+                // Stay safely below Vercel's 4.5 MB serverless response payload ceiling.
+                if (($runningBytes + strlen($piece)) > self::VERCEL_MAX_PAYLOAD_BYTES && (getenv('VERCEL') || getenv('VERCEL_ENV'))) {
+                    $piece = $this->fallbackPdf($document);
+                }
+
+                $this->appendPdf($merged, $piece);
+                $runningBytes += strlen($piece);
             } catch (\Throwable $exception) {
-                // Gracefully include a fallback page with a direct link so the report never fails to download.
-                $this->appendPdf($merged, $this->fallbackPdf($document));
+                $fallback = $this->fallbackPdf($document);
+                $this->appendPdf($merged, $fallback);
+                $runningBytes += strlen($fallback);
             }
         }
 
-        return $merged->Output('S');
+        $output = $merged->Output('S');
+        if (strlen($output) > self::VERCEL_MAX_PAYLOAD_BYTES && (getenv('VERCEL') || getenv('VERCEL_ENV'))) {
+            return $report;
+        }
+
+        return $output;
+    }
+
+    private function renderPdf(string $view, array $data, string $paper = 'a4'): string
+    {
+        return Pdf::loadView($view, $data)
+            ->setPaper($paper)
+            ->setOption([
+                'enable_font_subsetting' => true,
+                'isRemoteEnabled' => false,
+            ])
+            ->output();
     }
 
     private function readDocument(Document $document): string
@@ -104,21 +134,34 @@ class CaseReportBuilder
             throw new \RuntimeException('Unsupported document format.');
         }
 
-        // Normalize WebP to PNG for consistent Dompdf support.
-        if ($mime === 'image/webp') {
-            $image = imagecreatefromstring($bytes);
+        // Downscale & compress large images (e.g. 5MB phone photos) so merged PDF stays lightweight.
+        if (function_exists('imagecreatefromstring')) {
+            $image = @imagecreatefromstring($bytes);
             if ($image === false) {
                 throw new \RuntimeException('Unreadable image.');
             }
-            ob_start();
             try {
-                imagepng($image);
-                $bytes = ob_get_contents();
+                $width = imagesx($image);
+                $height = imagesy($image);
+                if ($width > 1400) {
+                    $scaled = imagescale($image, 1400);
+                    if ($scaled !== false) {
+                        imagedestroy($image);
+                        $image = $scaled;
+                    }
+                }
+                if ($mime === 'image/webp' || strlen($bytes) > 350_000) {
+                    ob_start();
+                    imagejpeg($image, null, 78);
+                    $compressed = ob_get_clean();
+                    if (is_string($compressed) && $compressed !== '') {
+                        $bytes = $compressed;
+                        $mime = 'image/jpeg';
+                    }
+                }
             } finally {
-                ob_end_clean();
                 imagedestroy($image);
             }
-            $mime = 'image/png';
         }
 
         if (@getimagesizefromstring($bytes) === false) {
@@ -126,7 +169,7 @@ class CaseReportBuilder
         }
         $imageUri = 'data:'.$mime.';base64,'.base64_encode($bytes);
 
-        return Pdf::loadView('reports.evidence-image', compact('imageUri'))->setPaper('a4')->output();
+        return $this->renderPdf('reports.evidence-image', compact('imageUri'));
     }
 
     private function docxPdf(string $bytes, string $title): string
@@ -199,7 +242,7 @@ class CaseReportBuilder
             @unlink($tmp);
         }
 
-        return Pdf::loadView('reports.evidence-text', compact('title', 'blocks'))->setPaper('a4')->output();
+        return $this->renderPdf('reports.evidence-text', compact('title', 'blocks'));
     }
 
     private function textPdf(string $bytes, string $title): string
@@ -212,13 +255,13 @@ class CaseReportBuilder
             }
         }
 
-        return Pdf::loadView('reports.evidence-text', compact('title', 'blocks'))->setPaper('a4')->output();
+        return $this->renderPdf('reports.evidence-text', compact('title', 'blocks'));
     }
 
     private function fallbackPdf(Document $document): string
     {
         $viewUrl = route('documents.view', $document);
 
-        return Pdf::loadView('reports.evidence-fallback', compact('document', 'viewUrl'))->setPaper('a4')->output();
+        return $this->renderPdf('reports.evidence-fallback', compact('document', 'viewUrl'));
     }
 }

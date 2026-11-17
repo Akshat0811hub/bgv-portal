@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <style>
         @page { margin: 48px; }
-        body { font-family: "DejaVu Sans", sans-serif; color: #1e293b; font-size: 12px; line-height: 1.6; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; font-size: 12px; line-height: 1.6; }
         .label { color: #0d9488; font-size: 12px; text-transform: uppercase; }
         h1 { color: #0f2044; font-size: 24px; margin: 8px 0 28px; }
         .file { padding: 20px; background: #f1f5f9; border-left: 4px solid #0d9488; overflow-wrap: anywhere; }

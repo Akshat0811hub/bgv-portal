@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <style>
         @page { margin: 36px; }
-        body { font-family: "DejaVu Sans", sans-serif; color: #1e293b; font-size: 10.5px; line-height: 1.55; }
+        body { font-family: Helvetica, Arial, sans-serif; color: #1e293b; font-size: 10.5px; line-height: 1.55; }
         .hdr { border-bottom: 2px solid #0d9488; padding-bottom: 8px; margin-bottom: 16px; }
         .hdr .kicker { font-size: 9px; color: #0d9488; text-transform: uppercase; letter-spacing: 0.6px; }
         .hdr .title { font-size: 13px; font-weight: bold; color: #0f2044; margin-top: 2px; }
