@@ -43,8 +43,18 @@ class Setting extends Model
         $fromAddr = static::getValue('mail_from_address') ?: config('mail.from.address');
         $fromName = static::getValue('mail_from_name') ?: config('mail.from.name', 'Orbit Verify');
 
+        // Auto-correct Laravel's local default 127.0.0.1:2525 if a real email username was provided
+        if (($host === '127.0.0.1' || empty($host)) && ! empty($username)) {
+            if (str_ends_with(strtolower($username), '@gmail.com') || str_ends_with(strtolower($username), '@googlemail.com')) {
+                $host = 'smtp.gmail.com';
+                $port = 587;
+                $enc  = 'tls';
+            }
+        }
+
         if ($mailer === 'smtp' && ! empty($host) && ! empty($username) && ! empty($password)) {
             Config::set('mail.default', 'smtp');
+            Config::set('mail.mailers.smtp.url', null);
             Config::set('mail.mailers.smtp.host', $host);
             Config::set('mail.mailers.smtp.port', (int) $port);
             Config::set('mail.mailers.smtp.scheme', ($enc === 'ssl' || (int) $port === 465) ? 'smtps' : 'smtp');
@@ -52,6 +62,12 @@ class Setting extends Model
             Config::set('mail.mailers.smtp.password', $password);
             Config::set('mail.from.address', $fromAddr ?: $username);
             Config::set('mail.from.name', $fromName ?: 'Orbit Verify');
+
+            try {
+                \Illuminate\Support\Facades\Mail::purge('smtp');
+            } catch (\Throwable $e) {
+                // ignore if mail manager not resolved yet
+            }
 
             return true;
         }

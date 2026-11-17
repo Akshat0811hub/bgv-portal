@@ -11,10 +11,19 @@ class SettingController extends Controller
 {
     public function email()
     {
+        $rawHost = Setting::getValue('mail_host', config('mail.mailers.smtp.host', 'smtp.gmail.com'));
+        $rawPort = Setting::getValue('mail_port', (string) config('mail.mailers.smtp.port', 587));
+        if ($rawHost === '127.0.0.1' || empty($rawHost)) {
+            $rawHost = 'smtp.gmail.com';
+        }
+        if ($rawPort === '2525' || empty($rawPort)) {
+            $rawPort = '587';
+        }
+
         $settings = [
             'mail_mailer'       => Setting::getValue('mail_mailer', config('mail.default', 'log')),
-            'mail_host'         => Setting::getValue('mail_host', config('mail.mailers.smtp.host', 'smtp.gmail.com')),
-            'mail_port'         => Setting::getValue('mail_port', (string) config('mail.mailers.smtp.port', 587)),
+            'mail_host'         => $rawHost,
+            'mail_port'         => $rawPort,
             'mail_encryption'   => Setting::getValue('mail_encryption', env('MAIL_ENCRYPTION', 'tls')),
             'mail_username'     => Setting::getValue('mail_username', config('mail.mailers.smtp.username')),
             'mail_password'     => Setting::getValue('mail_password', config('mail.mailers.smtp.password')),
