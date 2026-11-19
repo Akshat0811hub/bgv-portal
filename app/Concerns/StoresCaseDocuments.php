@@ -121,7 +121,17 @@ trait StoresCaseDocuments
             $payload['file_content'] = $rawContent;
         }
 
-        return Document::create($payload);
+        try {
+            return Document::create($payload);
+        } catch (\Throwable $e) {
+            // If MySQL max_allowed_packet rejects large file_content, fall back to disk-only storage.
+            if (isset($payload['file_content']) && \Illuminate\Support\Facades\Storage::disk('local')->exists($path)) {
+                $payload['file_content'] = null;
+
+                return Document::create($payload);
+            }
+            throw $e;
+        }
     }
 
     /**

@@ -24,7 +24,8 @@ class AppServiceProvider extends ServiceProvider
         }
 
         // Auto-initialize schema & default users on fresh cloud databases (e.g. Hostinger MySQL / Neon / TiDB)
-        if (! $this->app->runningInConsole() && ! file_exists(sys_get_temp_dir() . '/.orbit_db_ready_v4')) {
+        $dbReadyMarker = sys_get_temp_dir() . '/.orbit_db_ready_' . md5(base_path()) . '_v4';
+        if (! $this->app->runningInConsole() && ! file_exists($dbReadyMarker)) {
             try {
                 if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
@@ -38,7 +39,7 @@ class AppServiceProvider extends ServiceProvider
                 ) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
                 }
-                @touch(sys_get_temp_dir() . '/.orbit_db_ready_v4');
+                @touch($dbReadyMarker);
             } catch (\Throwable $e) {
                 // Database connection not ready yet
             }
