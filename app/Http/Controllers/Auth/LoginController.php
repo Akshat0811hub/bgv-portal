@@ -18,19 +18,19 @@ class LoginController extends Controller
         ]);
 
         if (!auth()->attempt($credentials, $request->boolean('remember'))) {
-            return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
+            return back()->withErrors(['email' => 'Invalid credentials.'])->withInput($request->only('email'));
         }
 
         $user = auth()->user();
 
         if (!$user->is_verified) {
             auth()->logout();
-            return back()->withErrors(['email' => 'Your account is pending verification.'])->withInput();
+            return back()->withErrors(['email' => 'Your account is pending verification.'])->withInput($request->only('email'));
         }
 
         if (!$user->isClient()) {
             auth()->logout();
-            return back()->withErrors(['email' => 'Please use the admin portal to log in.'])->withInput();
+            return back()->withErrors(['email' => 'Please use the admin portal to log in.'])->withInput($request->only('email'));
         }
 
         $request->session()->regenerate();
@@ -50,19 +50,19 @@ class LoginController extends Controller
         ]);
 
         if (!auth()->attempt($credentials)) {
-            return back()->withErrors(['email' => 'Invalid credentials.'])->withInput();
+            return back()->withErrors(['email' => 'Invalid credentials.'])->withInput($request->only('email'));
         }
 
         $user = auth()->user();
 
         if (!$user->isAdmin()) {
             auth()->logout();
-            return back()->withErrors(['email' => 'Access denied. Not an admin account.'])->withInput();
+            return back()->withErrors(['email' => 'Access denied. Not an admin account.'])->withInput($request->only('email'));
         }
 
         if (!$user->is_verified) {
             auth()->logout();
-            return back()->withErrors(['email' => 'Your account is pending verification or has been deactivated.'])->withInput();
+            return back()->withErrors(['email' => 'Your account is pending verification or has been deactivated.'])->withInput($request->only('email'));
         }
 
         $request->session()->regenerate();

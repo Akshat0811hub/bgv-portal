@@ -41,6 +41,8 @@ return [
 
     'debug' => (bool) env('APP_DEBUG', false),
 
+    'auto_initialize_database' => (bool) env('AUTO_INITIALIZE_DATABASE', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application URL

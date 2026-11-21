@@ -23,13 +23,13 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Auto-initialize schema & default users on fresh cloud databases (e.g. Hostinger MySQL / Neon / TiDB)
+        // Permanent hosting is migrated explicitly before accepting requests.
+        // Legacy ephemeral deployments may opt in while they are being retired.
         $dbReadyMarker = sys_get_temp_dir() . '/.orbit_db_ready_' . md5(base_path()) . '_v4';
-        if (! $this->app->runningInConsole() && ! file_exists($dbReadyMarker)) {
+        if (config('app.auto_initialize_database') && ! $this->app->runningInConsole() && ! file_exists($dbReadyMarker)) {
             try {
                 if (! \Illuminate\Support\Facades\Schema::hasTable('users')) {
                     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-                    \Illuminate\Support\Facades\Artisan::call('db:seed', ['--force' => true]);
                 } elseif (
                     ! \Illuminate\Support\Facades\Schema::hasColumn('documents', 'file_content') ||
                     ! \Illuminate\Support\Facades\Schema::hasColumn('case_checks', 'custom_schema') ||

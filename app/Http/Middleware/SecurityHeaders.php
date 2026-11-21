@@ -12,6 +12,11 @@ class SecurityHeaders
     {
         $response = $next($request);
 
+        // Web routes contain account and candidate data, including original files.
+        // Static assets are served separately and do not pass through this middleware.
+        $response->headers->set('Cache-Control', 'private, no-store');
+        $response->headers->set('Pragma', 'no-cache');
+
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
         $response->headers->set('X-XSS-Protection', '1; mode=block');
